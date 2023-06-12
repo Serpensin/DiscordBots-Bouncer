@@ -1,0 +1,29 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.6.33723.286
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "DiscordBots-Bouncer", "DiscordBots-Bouncer.pyproj", "{2DF8665E-D17C-4BBE-92B5-7C497DE4FE63}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Projektmappenelemente", "Projektmappenelemente", "{64ED31FD-4731-47E4-912D-AFC6E06A3F5B}"
+	ProjectSection(SolutionItems) = preProject
+		.env = .env
+		.env.template = .env.template
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{2DF8665E-D17C-4BBE-92B5-7C497DE4FE63}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2DF8665E-D17C-4BBE-92B5-7C497DE4FE63}.Release|Any CPU.ActiveCfg = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {4E9AB348-2700-4DAA-AABA-8AF2889361E0}
+	EndGlobalSection
+EndGlobal
