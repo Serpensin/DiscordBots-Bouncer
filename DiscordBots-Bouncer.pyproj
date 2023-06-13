@@ -25,6 +25,8 @@
     <Compile Include="main.py" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include=".env" />
+    <Content Include=".env.template" />
     <Content Include="requirements.txt" />
   </ItemGroup>
   <ItemGroup>

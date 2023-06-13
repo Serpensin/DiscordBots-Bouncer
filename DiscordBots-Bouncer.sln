@@ -7,10 +7,9 @@ Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "DiscordBots-Bouncer", "Disc
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Projektmappenelemente", "Projektmappenelemente", "{64ED31FD-4731-47E4-912D-AFC6E06A3F5B}"
 	ProjectSection(SolutionItems) = preProject
-		.env = .env
-		.env.template = .env.template
 		.gitattributes = .gitattributes
 		.gitignore = .gitignore
+		.gitlab-ci.yml = .gitlab-ci.yml
 	EndProjectSection
 EndProject
 Global
