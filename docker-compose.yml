@@ -1,0 +1,19 @@
+version: '3'
+
+services:
+  bouncer:
+    container_name: Bouncer
+    deploy:
+      restart_policy:
+        condition: any
+    environment:
+      SENTRY_DSN: SENTRY_DSN_FOR_ERROR_REPORTING
+      SUPPORT_SERVER: ID_OF_SUPPORTSERVER
+      TOKEN: BOT_TOKEN
+      OWNER_ID: DISCORD_ID_OF_OWNER
+    image: serpensin/bouncer
+    volumes:
+    - bouncer:/app/Bouncer
+
+volumes:
+    bouncer:
