@@ -591,14 +591,12 @@ async def self(interaction: discord.Interaction):
             self.add_item(discord.ui.Button(label='Why?', style=discord.ButtonStyle.blurple, custom_id='why'))
 
 
-    embed = discord.Embed(title = ':robot: Verification required',
-                          description = f'To proceed to `{interaction.guild.name}`, we kindly ask you to confirm your humanity by solving a captcha. Simply click the button below to get started!',
-                          color = 0x2b63b0)
-
     c.execute('SELECT * FROM servers WHERE guild_id = ?', (interaction.guild.id,))
     data = c.fetchone()
     if data:
         verify_channel_id = data[1]
+        timeout = int(data[4] / 60)
+        action = data[5]
     else:
         verify_channel_id = None
     try:
@@ -611,6 +609,12 @@ async def self(interaction: discord.Interaction):
     if not verify_channel:
         await interaction.followup.send('The verification channel is not set or doesn\'t exist. Please set it with `/setup`.', ephemeral = True)
         return
+
+
+    embed = discord.Embed(title = ':robot: Verification required',
+                          description = f"To proceed to `{interaction.guild.name}`, we kindly ask you to confirm your humanity by solving a captcha. Simply click the button below to get started!\n\nPlease note that you'll be {'kicked' if action == 'kick' else 'banned'} if you do not verify yourself within {timeout} minutes.",
+                          color = 0x2b63b0)
+
 
     c.execute('SELECT * FROM panels WHERE guild_id = ?', (interaction.guild_id,))
     data = c.fetchone()
