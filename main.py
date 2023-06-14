@@ -237,7 +237,7 @@ class Events():
             for option in options:
                 option_values += f"{option['name']}: {option['value']}"
         if isinstance(error, discord.app_commands.CommandOnCooldown):
-            await interaction.response.send_message(f'This command is on cooldown.\nTime left: `{str(timedelta(seconds=error.retry_after))}`.', ephemeral=True)
+            await interaction.response.send_message(f'This command is on cooldown.\nTime left: `{str(timedelta(seconds=int(error.retry_after)))}`.', ephemeral=True)
         else:
             try:
                 await interaction.followup.send(f"{error}\n\n{option_values}", ephemeral=True)
@@ -259,7 +259,8 @@ class Events():
             button_id = interaction.data.get('custom_id')
 
             if button_id == 'verify':
-                await interaction.response.send_message('Verified', ephemeral=True)
+                await Functions.verify(interaction)
+                return
             elif button_id == 'why':
                 await interaction.response.send_message(f'This serever is protected by <@!{bot.user.id}> to prevent raids & malicious users.\n\nTo gain access to this server, you\'ll need to verify yourself by completing a captcha.\n\nYou don\'t need to connect your account for that.', view = WhyView(), ephemeral=True)
 
@@ -268,9 +269,8 @@ class Events():
 #Functions
 class Functions():
     def create_captcha():
-        captcha_text = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(6))
+        captcha_text = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(6))
         data = image_captcha.generate(captcha_text)
-        image_captcha.write(captcha_text, f'{app_folder_name}{captcha_text}.png')
         return io.BytesIO(data.read()), captcha_text
 
 
@@ -306,6 +306,49 @@ class Functions():
         return "Could not create invite. There is either no text-channel, or I don't have the rights to create an invite."
 
 
+    async def verify(interaction: discord.Interaction):
+        class CaptchaInput(discord.ui.Modal, title = 'Verification'):
+            self.timeout = 60
+            answer = discord.ui.TextInput(label = 'Please enter the captcha text:', placeholder = 'Captcha text', min_length = 6, max_length = 6, style = discord.TextStyle.short, required = True)
+            async def on_submit(self, interaction: discord.Interaction):
+                if self.answer.value.upper() == captcha_text:
+                    await interaction.response.edit_message(content = 'You have successfully verified yourself.', view = None)
+                    await interaction.user.add_roles(interaction.guild.get_role(int(verified_role_id)))
+                else:
+                    await interaction.response.edit_message(content = 'The captcha text you entered is incorrect.', view = None)
+        
+
+        class SubmitButton(discord.ui.Button):
+            def __init__(self):
+                super().__init__(label='Submit', custom_id='captcha_submit', style=discord.ButtonStyle.blurple)
+
+            async def callback(self, interaction: discord.Interaction):
+                view = CaptchaInput()
+                await interaction.response.send_modal(view)
+
+
+        class SubmitView(discord.ui.View):
+            def __init__(self, *, timeout=900):
+                super().__init__(timeout=timeout)
+                self.add_item(SubmitButton())
+
+
+        #Load verify_role from db
+        c.execute(f'SELECT verify_role FROM servers WHERE guild_id = {interaction.guild_id}')
+        verified_role_id = c.fetchone()[0]
+
+        #Test if user allready has the role
+        if interaction.guild.get_role(int(verified_role_id)) in interaction.user.roles:
+            await interaction.response.send_message('You are already verified.', ephemeral = True)
+            return
+
+        captcha = Functions.create_captcha()
+        captcha_picture = discord.File(captcha[0], filename = 'captcha.png')
+        captcha_text = captcha[1]
+        
+
+
+        await interaction.response.send_message(f'Please verify yourself to gain access to this server.\n\n**Captcha:**', file = captcha_picture, view = SubmitView(), ephemeral = True)
 
 
 
