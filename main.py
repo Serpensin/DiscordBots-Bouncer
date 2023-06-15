@@ -15,7 +15,7 @@ import string
 import sys
 import time
 from captcha.image import ImageCaptcha
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, timezone
 from dotenv import load_dotenv
 from zipfile import ZIP_DEFLATED, ZipFile
 
@@ -138,6 +138,7 @@ class aclient(discord.AutoShardedClient):
     def __init__(self):
 
         intents = discord.Intents.default()
+        intents.members = True
 
         super().__init__(owner_id = ownerID,
                               intents = intents,
@@ -198,6 +199,7 @@ class aclient(discord.AutoShardedClient):
             self.synced = True
             await bot.change_presence(activity = self.Presence.get_activity(), status = self.Presence.get_status())
         start_time = datetime.now()
+        bot.loop.create_task(Functions.check_and_kick_members(bot, c))
         manlogger.info('All systems online...')
         print('READY')
 bot = aclient()
@@ -351,6 +353,40 @@ class Functions():
         await interaction.response.send_message(f'Please verify yourself to gain access to this server.\n\n**Captcha:**', file = captcha_picture, view = SubmitView(), ephemeral = True)
 
 
+    async def check_and_kick_members(bot, c):
+        while True:
+            for guild in bot.guilds:
+                c.execute('SELECT * FROM servers WHERE guild_id = ?', (guild.id,))
+                row = c.fetchone()
+                if row is None:  # Skip if no settings for this guild
+                    continue
+                verified_role_id = row[2]
+                time_limit_seconds = row[4]
+                action = row[5]
+                if action == '':
+                    continue
+                verified_role = guild.get_role(verified_role_id)
+                for member in guild.members:
+                    if not member.bot and member.joined_at > guild.me.joined_at:
+                        time_since_joining = datetime.now(timezone.utc) - member.joined_at
+                        if time_since_joining > timedelta(seconds=time_limit_seconds):
+                            if verified_role not in member.roles:
+                                if action == 'kick':
+                                    try:
+                                        await member.kick(reason='Did not successfully verify in time.')
+                                        print(f'Kicked {member.name}#{member.discriminator} ({member.id}) from {guild.name} ({guild.id}).')
+                                    except discord.Forbidden:
+                                        print(f'Could not kick {member.name}#{member.discriminator} ({member.id}) from {guild.name} ({guild.id}).')
+                                elif action == 'ban':
+                                    try:
+                                        await member.ban(reason='Did not successfully verify in time.')
+                                        print(f'Banned {member.name}#{member.discriminator} ({member.id}) from {guild.name} ({guild.id}).')
+                                    except discord.Forbidden:
+                                        print(f'Could not ban {member.name}#{member.discriminator} ({member.id}) from {guild.name} ({guild.id}).')
+            await asyncio.sleep(60*1)
+
+
+
 
 
 
@@ -361,9 +397,12 @@ if owner_available:
     async def self(interaction: discord.Interaction):
         if interaction.user.id == int(ownerID):
             manlogger.info('Engine powering down...')
+            await interaction.response.send_message('Engine powering down...', ephemeral = True)
             await bot.change_presence(status = discord.Status.invisible)
             conn.close()
-            await interaction.response.send_message('Engine powering down...', ephemeral = True)
+            for task in asyncio.all_tasks():
+                task.cancel()
+            await asyncio.gather(*asyncio.all_tasks(), return_exceptions = False) 
             await bot.close()
         else:
             await interaction.response.send_message('Only the BotOwner can use this command!', ephemeral = True)
