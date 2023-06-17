@@ -24,18 +24,11 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 
 #Init
-global shutdown
-shutdown = False
 discord.VoiceClient.warn_nacl = False
 load_dotenv()
 image_captcha = ImageCaptcha()
-def before_send(event, hint):
-	if shutdown:
-		return None
-	return event
 sentry_sdk.init(
 	dsn=os.getenv('SENTRY_DSN'),
-	before_send=before_send,
 	traces_sample_rate=1.0,
 	profiles_sample_rate=1.0,
 	environment='Development'
@@ -141,7 +134,7 @@ class aclient(discord.AutoShardedClient):
 	
 		self.synced = False
 		self.db_conns = {}
-		self.captcha_timeout = []
+		self.captcha_timeout = [] 
 
 
 	class Presence():
@@ -176,6 +169,79 @@ class aclient(discord.AutoShardedClient):
 				return discord.Status.dnd
 			elif status == 'invisible':
 				return discord.Status.invisible
+
+
+	async def on_app_command_error(self, interaction: discord.Interaction, error: discord.app_commands.AppCommandError) -> None:
+		if not self.initialized:
+			return
+		options = interaction.data.get("options")
+		option_values = ""
+		if options:
+			for option in options:
+				option_values += f"{option['name']}: {option['value']}"
+		if isinstance(error, discord.app_commands.CommandOnCooldown):
+			await interaction.response.send_message(f'This command is on cooldown.\nTime left: `{str(timedelta(seconds=int(error.retry_after)))}`.', ephemeral=True)
+		else:
+			try:
+				await interaction.followup.send(f"{error}\n\n{option_values}", ephemeral=True)
+			except:
+				await interaction.response.send_message(f"{error}\n\n{option_values}", ephemeral=True)
+			manlogger.warning(f"{error} -> {option_values} | Invoked by {interaction.user.name} ({interaction.user.id})")
+
+
+	async def on_guild_join(self, guild):
+		if not self.initialized:
+			return
+		manlogger.info(f'I joined {guild}. (ID: {guild.id})')
+
+
+	async def on_guild_remove(self, guild):
+		if not self.initialized:
+			return
+		manlogger.info(f'I got kicked from {guild}. (ID: {guild.id})')
+
+
+	async def on_member_join(self, member: discord.Member):
+		if not self.initialized:
+			return
+		if member.bot:
+			return
+		c.execute('SELECT action FROM servers WHERE guild_id = ?', (member.guild.id,))
+		result = c.fetchone()
+		if result is None or result[0] is None:
+			return
+		c.execute('INSERT INTO processing_joined VALUES (?, ?, ?)', (member.guild.id, member.id, int(time.time(),)))
+		conn.commit()
+
+
+	async def on_member_remove(self, member: discord.Member):
+		if not self.initialized:
+			return
+		c.execute('DELETE FROM processing_joined WHERE guild_id = ? AND user_id = ?', (member.guild.id, member.id,))
+
+
+	async def on_interaction(self, interaction: discord.Interaction):
+		if not self.initialized:
+			return
+		class WhyView(discord.ui.View):
+			def __init__(self, *, timeout=None):
+				super().__init__(timeout=timeout)
+
+				self.add_item(discord.ui.Button(label='Secure your server', url = f'https://discord.com/api/oauth2/authorize?client_id={bot.user.id}&permissions=268503046&scope=bot%20applications.commands', style=discord.ButtonStyle.link))
+
+
+		if interaction.data and interaction.data.get('component_type') == 2:  # 2 is the component type for button
+			button_id = interaction.data.get('custom_id')
+		
+			if button_id == 'verify':
+				if interaction.user.id in bot.captcha_timeout:
+					await interaction.response.send_message('Please wait a few seconds before trying again.', ephemeral=True)
+					return
+				else:
+					await Functions.verify(interaction)
+					return
+			elif button_id == 'why':
+				await interaction.response.send_message(f'This serever is protected by <@!{bot.user.id}> to prevent raids & malicious users.\n\nTo gain access to this server, you\'ll need to verify yourself by completing a captcha.\n\nYou don\'t need to connect your account for that.', view = WhyView(), ephemeral=True)
 
 
 	async def setup_database(self, shard_id):
@@ -219,7 +285,7 @@ class aclient(discord.AutoShardedClient):
 		conn = sqlite3.connect(db_file)
 		c = conn.cursor()
 		await self.setup_database(shard_id)
-
+		
 		try:
 			owner = await self.fetch_user(ownerID)
 			if owner is None:
@@ -241,6 +307,7 @@ class aclient(discord.AutoShardedClient):
 		bot.loop.create_task(Functions.process_latest_joined())
 		bot.loop.create_task(Functions.check_and_process_temp_bans())
 
+		self.initialized = True
 		manlogger.info('All systems online...')
 		clear()
 		print('READY')
@@ -249,7 +316,7 @@ class aclient(discord.AutoShardedClient):
 		shard_id = self.shard_info.id if hasattr(self, 'shard_info') else 0
 		conn = self.db_conns.pop(shard_id, None)
 		if conn:
-			conn.close
+			conn.close()
 bot = aclient()
 tree = discord.app_commands.CommandTree(bot)
 
@@ -267,70 +334,6 @@ def clear():
 	else:
 		os.system('clear')
 
-
-
-##Events
-class Events():
-	@tree.error
-	async def on_app_command_error(interaction: discord.Interaction, error: discord.app_commands.AppCommandError) -> None:
-		options = interaction.data.get("options")
-		option_values = ""
-		if options:
-			for option in options:
-				option_values += f"{option['name']}: {option['value']}"
-		if isinstance(error, discord.app_commands.CommandOnCooldown):
-			await interaction.response.send_message(f'This command is on cooldown.\nTime left: `{str(timedelta(seconds=int(error.retry_after)))}`.', ephemeral=True)
-		else:
-			try:
-				await interaction.followup.send(f"{error}\n\n{option_values}", ephemeral=True)
-			except:
-				await interaction.response.send_message(f"{error}\n\n{option_values}", ephemeral=True)
-			manlogger.warning(f"{error} -> {option_values} | Invoked by {interaction.user.name} ({interaction.user.id})")
-
-	@bot.event
-	async def on_guild_join(guild):
-		manlogger.info(f'I joined {guild}. (ID: {guild.id})')
-
-	@bot.event
-	async def on_guild_remove(guild):
-		manlogger.info(f'I got kicked from {guild}. (ID: {guild.id})')
-
-	@bot.event
-	async def on_member_join(member: discord.Member):
-		if member.bot:
-			return
-		c.execute('SELECT action FROM servers WHERE guild_id = ?', (member.guild.id,))
-		result = c.fetchone()
-		if result is None or result[0] is None:
-			return
-		c.execute('INSERT INTO processing_joined VALUES (?, ?, ?)', (member.guild.id, member.id, int(time.time(),)))
-		conn.commit()
-
-	@bot.event
-	async def on_member_remove(member: discord.Member):
-		c.execute('DELETE FROM processing_joined WHERE guild_id = ? AND user_id = ?', (member.guild.id, member.id,))
-
-	@bot.event
-	async def on_interaction(interaction: discord.Interaction):
-		class WhyView(discord.ui.View):
-			def __init__(self, *, timeout=None):
-				super().__init__(timeout=timeout)
-
-				self.add_item(discord.ui.Button(label='Secure your server', url = f'https://discord.com/api/oauth2/authorize?client_id={bot.user.id}&permissions=268503046&scope=bot%20applications.commands', style=discord.ButtonStyle.link))
-
-
-		if interaction.data and interaction.data.get('component_type') == 2:  # 2 is the component type for button
-			button_id = interaction.data.get('custom_id')
-			
-			if button_id == 'verify':
-				if interaction.user.id in bot.captcha_timeout:
-					await interaction.response.send_message('Please wait a few seconds before trying again.', ephemeral=True)
-					return
-				else:
-					await Functions.verify(interaction)
-					return
-			elif button_id == 'why':
-				await interaction.response.send_message(f'This serever is protected by <@!{bot.user.id}> to prevent raids & malicious users.\n\nTo gain access to this server, you\'ll need to verify yourself by completing a captcha.\n\nYou don\'t need to connect your account for that.', view = WhyView(), ephemeral=True)
 
 
 #Functions
@@ -634,12 +637,12 @@ if owner_available:
 	@tree.command(name = 'shutdown', description = 'Savely shut down the bot.')
 	async def self(interaction: discord.Interaction):
 		if interaction.user.id == int(ownerID):
-			shutdown = True
 			manlogger.info('Engine powering down...')
 			await interaction.response.send_message('Engine powering down...', ephemeral = True)
 			await bot.change_presence(status = discord.Status.invisible)
 			conn.commit()
 			conn.close()
+			sentry_sdk.init(dsn='', traces_sample_rate=0.0, profiles_sample_rate=0.0)
 			for task in asyncio.all_tasks():
 				task.cancel()
 			await asyncio.gather(*asyncio.all_tasks(), return_exceptions = True)
