@@ -141,6 +141,7 @@ class aclient(discord.AutoShardedClient):
 	
 		self.synced = False
 		self.db_conns = {}
+		self.captcha_timeout = []
 
 
 	class Presence():
@@ -320,10 +321,14 @@ class Events():
 
 		if interaction.data and interaction.data.get('component_type') == 2:  # 2 is the component type for button
 			button_id = interaction.data.get('custom_id')
-
+			
 			if button_id == 'verify':
-				await Functions.verify(interaction)
-				return
+				if interaction.user.id in bot.captcha_timeout:
+					await interaction.response.send_message('Please wait a few seconds before trying again.', ephemeral=True)
+					return
+				else:
+					await Functions.verify(interaction)
+					return
 			elif button_id == 'why':
 				await interaction.response.send_message(f'This serever is protected by <@!{bot.user.id}> to prevent raids & malicious users.\n\nTo gain access to this server, you\'ll need to verify yourself by completing a captcha.\n\nYou don\'t need to connect your account for that.', view = WhyView(), ephemeral=True)
 
@@ -370,31 +375,51 @@ class Functions():
 
 	async def verify(interaction: discord.Interaction):
 		class CaptchaInput(discord.ui.Modal, title = 'Verification'):
-			self.timeout = 60
-			answer = discord.ui.TextInput(label = 'Please enter the captcha text:', placeholder = 'Captcha text', min_length = 6, max_length = 6, style = discord.TextStyle.short, required = True)
+			def __init__(self):
+				super().__init__()
+				#self.timeout = 60
+				#self.answer = discord.ui.TextInput(label = 'Please enter the captcha text:', placeholder = 'Captcha text', min_length = 6, max_length = 6, style = discord.TextStyle.short, required = True)
+				self.verification_successful = False
+
+			answer = discord.ui.TextInput(label = 'Please enter the captcha text:', placeholder = 'Captcha text', min_length = 6, max_length = 6, style = discord.TextStyle.short, required = True)	
+			
 			async def on_submit(self, interaction: discord.Interaction):
 				if self.answer.value.upper() == captcha_text:
+					await interaction.user.add_roles(interaction.guild.get_role(int(verified_role_id)))
 					await Functions.send_logging_message(interaction = interaction, kind = 'verify_success')
 					await interaction.response.edit_message(content = 'You have successfully verified yourself.', view = None)
-					await interaction.user.add_roles(interaction.guild.get_role(int(verified_role_id)))
+					if interaction.user.id in bot.captcha_timeout:
+						bot.captcha_timeout.remove(interaction.user.id)
+					self.verification_successful = True
+					print(self.verification_successful)
 				else:
 					await Functions.send_logging_message(interaction = interaction, kind = 'verify_fail')
 					await interaction.response.edit_message(content = 'The captcha text you entered is incorrect.', view = None)
 
 
+		captcha_input = CaptchaInput()
+
+
 		class SubmitButton(discord.ui.Button):
 			def __init__(self):
-				super().__init__(label='Submit', custom_id='captcha_submit', style=discord.ButtonStyle.blurple)
+				super().__init__(label='Enter Captcha', custom_id='captcha_submit', style=discord.ButtonStyle.blurple)
 
 			async def callback(self, interaction: discord.Interaction):
-				view = CaptchaInput()
-				await interaction.response.send_modal(view)
+				await interaction.response.send_modal(captcha_input)
 
 
 		class SubmitView(discord.ui.View):
-			def __init__(self, *, timeout=900):
+			def __init__(self, *, timeout=15):
 				super().__init__(timeout=timeout)
 				self.add_item(SubmitButton())
+
+			async def on_timeout(self):
+				print(captcha_input.verification_successful)
+				if not captcha_input.verification_successful:
+					self.remove_item(SubmitButton())
+					await interaction.edit_original_response(content = 'Captcha timed out. Request a new one.', view = None)
+					if interaction.user.id in bot.captcha_timeout:
+						bot.captcha_timeout.remove(interaction.user.id)
 
 
 		#Load verify_role from db
@@ -411,6 +436,7 @@ class Functions():
 		captcha_picture = discord.File(captcha[0], filename = 'captcha.png')
 		captcha_text = captcha[1]
 
+		bot.captcha_timeout.append(interaction.user.id)
 		await interaction.response.send_message(f'Please verify yourself to gain access to this server.\n\n**Captcha:**', file = captcha_picture, view = SubmitView(), ephemeral = True)
 
 
@@ -467,6 +493,8 @@ class Functions():
 									manlogger.debug(f'Banned {member.name}#{member.discriminator} ({member.id}) from {guild.name} ({guild.id}).')
 								except discord.Forbidden:
 									manlogger.debug(f'Could not ban {member.name}#{member.discriminator} ({member.id}) from {guild.name} ({guild.id}).')
+						else:
+							c.execute('DELETE FROM processing_joined WHERE guild_id = ? AND user_id = ?', (row[0], row[1]))
 				except Exception as e:
 					conn.commit()
 					raise e
@@ -542,7 +570,7 @@ class Functions():
 		ban_time = row[6]
 
 		if kind == 'verify_start':
-			embed = discord.Embed(title = 'Verification started', description = f'User {interaction.user.mention} started the verification process.', color = discord.Color.blurple())
+			embed = discord.Embed(title = 'Captcha sent', description = f'User {interaction.user.mention} requested a new captcha.', color = discord.Color.blurple())
 			embed.timestamp = datetime.utcnow()
 			await log_channel.send(embed = embed)
 		elif kind == 'verify_success':
@@ -550,7 +578,7 @@ class Functions():
 			embed.timestamp = datetime.utcnow()
 			await log_channel.send(embed = embed)
 		elif kind == 'verify_fail':
-			embed = discord.Embed(title = 'Verification failed', description = f'User {interaction.user.mention} entered a wrong captcha.', color = discord.Color.red())
+			embed = discord.Embed(title = 'Wrong captcha', description = f'User {interaction.user.mention} entered a wrong captcha.', color = discord.Color.red())
 			embed.timestamp = datetime.utcnow()
 			await log_channel.send(embed = embed)
 		elif kind == 'verify_kick':
@@ -572,7 +600,7 @@ class Functions():
 			embed.timestamp = datetime.utcnow()
 			await log_channel.send(embed = embed)
 		elif kind == 'verify_mass_success':
-			embed = discord.Embed(title = 'Mass verification successful', description = f'Successfully applied the verified role to {mass_amount} users.', color = discord.Color.green())
+			embed = discord.Embed(title = 'Mass verification successful', description = f'{interaction.user.mention} successfully applied the verified role to {mass_amount} users.', color = discord.Color.green())
 			embed.timestamp = datetime.utcnow()
 			await log_channel.send(embed = embed)
 		elif kind == 'unban':
@@ -799,7 +827,7 @@ async def self(interaction: discord.Interaction):
 	embed.add_field(name="Sentry-Version", value=f"{sentry_sdk.consts.VERSION}", inline=True)
 
 	embed.add_field(name="Repo", value=f"[GitLab](https://gitlab.bloodygang.com/Serpensin/DiscordBots-Bouncer)", inline=True)
-	embed.add_field(name="Invite", value=f"[Invite me](https://discord.com/api/oauth2/authorize?client_id={bot.user.id}&permissions=268503046&scope=bot%20applications.commands)", inline=True)
+	embed.add_field(name="Invite", value=f"[Invite me](https://discord.com/api/oauth2/authorize?client_id={bot.user.id}&permissions=268519430&scope=bot%20applications.commands)", inline=True)
 	embed.add_field(name="\u200b", value="\u200b", inline=True)
 
 	await interaction.response.send_message(embed=embed)
@@ -943,8 +971,12 @@ async def self(interaction: discord.Interaction, verify_channel: discord.TextCha
 	if not interaction.guild.me.top_role > verify_role:
 		await interaction.response.send_message(f'My highest role needs to be above {verify_role.mention}, so I can assign it.', ephemeral=True)
 		return
-	if not log_channel.permissions_for(interaction.guild.me).send_messages:
-		await interaction.response.send_message(f'I need the permission to send messages in {log_channel.mention}.', ephemeral=True)
+	bot_permissions = log_channel.permissions_for(interaction.guild.me)
+	if not bot_permissions.view_channel:
+		await interaction.response.send_message(f'I need the permission to see {log_channel.mention}.', ephemeral=True)
+		return
+	if not (bot_permissions.send_messages and bot_permissions.embed_links):
+		await interaction.response.send_message(f'I need the permission to send messages and embed links in {log_channel.mention}.', ephemeral=True)
 		return
 	if action == 'kick' or action == 'ban':
 		if not interaction.guild.me.guild_permissions.kick_members:
@@ -981,7 +1013,7 @@ async def self(interaction: discord.Interaction):
 
 
 #Verify all users
-@tree.command(name = 'verify_all', description = 'Verify all non-bot users on the server.')
+@tree.command(name = 'verify-all', description = 'Verify all non-bot users on the server.')
 @discord.app_commands.checks.cooldown(1, 3600, key=lambda i: (i.guild_id))
 @discord.app_commands.checks.has_permissions(manage_guild = True)
 async def self(interaction: discord.Interaction):
@@ -1008,6 +1040,12 @@ async def self(interaction: discord.Interaction):
 			await interaction.response.send_message('There are no settings for this server.\nUse `/setup` to set-up this server.', ephemeral=True)
 	else:
 		await interaction.response.send_message('There are no settings for this server.\nUse `/setup` to set-up this server.', ephemeral=True)
+
+
+
+
+
+
 
 
 
