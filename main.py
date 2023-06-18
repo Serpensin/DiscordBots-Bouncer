@@ -31,7 +31,7 @@ sentry_sdk.init(
 	dsn=os.getenv('SENTRY_DSN'),
 	traces_sample_rate=1.0,
 	profiles_sample_rate=1.0,
-	environment='Development'
+	environment='Production'
 )
 app_folder_name = 'Bouncer'
 bot_name = 'Bouncer'
@@ -105,10 +105,10 @@ class JSONValidator:
 					data = json.load(file)
 					jsonschema.validate(instance=data, schema=self.schema)  # validate the data
 				except jsonschema.exceptions.ValidationError as ve:
-					print(f'ValidationError: {ve}')
+					manlogger.debug(f'ValidationError: {ve}')
 					self.write_default_content()
 				except json.decoder.JSONDecodeError as jde:
-					print(f'JSONDecodeError: {jde}')
+					manlogger.debug(f'JSONDecodeError: {jde}')
 					self.write_default_content()
 		else:
 			self.write_default_content()
@@ -797,6 +797,7 @@ async def self(interaction: discord.Interaction):
 	await interaction.edit_original_response(content=f'Pong! \nCommand execution time: `{int(ping)}ms`\nPing to gateway: `{int(bot.latency * 1000)}ms`')
 
 
+
 #Bot Info
 @tree.command(name = 'botinfo', description = 'Get information about the bot.')
 @discord.app_commands.checks.cooldown(1, 60, key=lambda i: (i.user.id))
@@ -836,6 +837,7 @@ async def self(interaction: discord.Interaction):
 	await interaction.response.send_message(embed=embed)
 
 
+
 #Change Nickname
 @tree.command(name = 'change_nickname', description = 'Change the nickname of the bot.')
 @discord.app_commands.checks.cooldown(1, 60, key=lambda i: (i.guild_id))
@@ -844,6 +846,7 @@ async def self(interaction: discord.Interaction):
 async def self(interaction: discord.Interaction, nick: str):
 	await interaction.guild.me.edit(nick=nick)
 	await interaction.response.send_message(f'My new nickname is now **{nick}**.', ephemeral=True)
+
 
 
 #Support Invite
@@ -856,6 +859,7 @@ if support_available:
 			await interaction.followup.send(await Functions.create_support_invite(interaction), ephemeral = True)
 		else:
 			await interaction.response.send_message('You are already in our support server!', ephemeral = True)
+
 
 
 #Send pannel
@@ -1063,13 +1067,15 @@ async def self(interaction: discord.Interaction):
 
 
 if __name__ == '__main__':
-	if not TOKEN:
-		manlogger.critical('Missing token. Please check your .env file.')
-		sys.exit('Missing token. Please check your .env file.')
-	else:
-		try:
-			bot.run(TOKEN, log_handler=None)
-		except discord.errors.LoginFailure:
-			manlogger.critical('Invalid token. Please check your .env file.')
-			sys.exit('Invalid token. Please check your .env file.')
+    if not TOKEN:
+        error_message = 'Missing token. Please check your .env file.'
+        manlogger.critical(error_message)
+        sys.exit(error_message)
+    else:
+        try:
+            bot.run(TOKEN, log_handler=None)
+        except discord.errors.LoginFailure:
+            error_message = 'Invalid token. Please check your .env file.'
+            manlogger.critical(error_message)
+            sys.exit(error_message)
 
