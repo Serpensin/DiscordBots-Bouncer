@@ -16,9 +16,11 @@ RUN python -m pip install --upgrade pip
 RUN pip install --upgrade setuptools
 RUN apk add --no-cache jpeg-dev zlib-dev libjpeg
 RUN if [ "$TARGETPLATFORM" = "linux/arm/v6" ] || [ "$TARGETPLATFORM" = "linux/arm/v7" ]; then \
-        apk add --no-cache --virtual .build-deps gcc musl-dev python3-dev; \
+        apk add --no-cache --virtual .build-deps; \
     fi
+RUN apk add --no-cache gcc musl-dev python3-dev
 RUN pip install -r requirements.txt
+RUN apk del gcc musl-dev python3-dev
 
 LABEL maintainer="Discord: the_devil_of_the_rhine (863687441809801246)"
 LABEL commit=$COMMIT
