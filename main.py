@@ -656,9 +656,9 @@ class Functions():
 #Shutdown
 @tree.command(name = 'shutdown', description = 'Safely shut down the bot.')
 async def self(interaction: discord.Interaction):
-	global shutdown
-	shutdown = True
 	if interaction.user.id == int(ownerID):
+		global shutdown
+		shutdown = True
 		manlogger.info('Engine powering down...')
 		await interaction.response.send_message('Engine powering down...', ephemeral=True)
 		await bot.change_presence(status=discord.Status.invisible)
