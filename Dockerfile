@@ -19,7 +19,7 @@ RUN if [ "$TARGETPLATFORM" = "linux/arm/v6" ] || [ "$TARGETPLATFORM" = "linux/ar
     fi
 RUN pip install -r requirements.txt
 
-LABEL maintainer="Discord: tanja_degurechaff"
+LABEL maintainer="Discord: the_devil_of_the_rhine (863687441809801246)"
 LABEL commit=$COMMIT
 LABEL description="Discord Bot for automatically assigning users a role after they complete a captcha."
 LABEL release=$BUILD_DATE
