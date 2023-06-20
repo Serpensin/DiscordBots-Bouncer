@@ -44,7 +44,7 @@ log_folder = f'{app_folder_name}//Logs//'
 buffer_folder = f'{app_folder_name}//Buffer//'
 activity_file = os.path.join(app_folder_name, 'activity.json')
 db_file = os.path.join(app_folder_name, f'{bot_name}.db')
-bot_version = "1.0.0"
+bot_version = "1.0.1"
 
 #Logger init
 logger = logging.getLogger('discord')
@@ -415,7 +415,6 @@ class Functions():
 					if interaction.user.id in bot.captcha_timeout:
 						bot.captcha_timeout.remove(interaction.user.id)
 					self.verification_successful = True
-					print(self.verification_successful)
 				else:
 					await Functions.send_logging_message(interaction = interaction, kind = 'verify_fail')
 					await interaction.response.edit_message(content = 'The captcha text you entered is incorrect.', view = None)
@@ -438,7 +437,6 @@ class Functions():
 				self.add_item(SubmitButton())
 
 			async def on_timeout(self):
-				print(captcha_input.verification_successful)
 				if not captcha_input.verification_successful:
 					self.remove_item(SubmitButton())
 					await interaction.edit_original_response(content = 'Captcha timed out. Request a new one.', view = None)
@@ -1003,11 +1001,16 @@ async def self(interaction: discord.Interaction):
 	discord.app_commands.Choice(name = 'Nothing', value = '')
 	])
 async def self(interaction: discord.Interaction, verify_channel: discord.TextChannel, verify_role: discord.Role, log_channel: discord.TextChannel, timeout: int, action: str, ban_time: str = None):
-	if ban_time is not None:
-		ban_time = timeparse(ban_time)
-		if ban_time is None:
-			await interaction.response.send_message('Invalid ban time. Please use the following format: `1d / 1h / 1m / 1s`.\nFor example: `1d2h3m4s`', ephemeral=True)
+	if action == 'kick':
+		if not interaction.guild.me.guild_permissions.kick_members:
+			await interaction.response.send_message(f'I need the permission to {action} members.', ephemeral=True)
 			return
+	elif action == 'ban':
+		if not interaction.guild.me.guild_permissions.ban_members:
+			await interaction.response.send_message(f'I need the permission to {action} members.', ephemeral=True)
+			return
+	if action == '':
+		action = None
 	if not verify_channel.permissions_for(interaction.guild.me).send_messages:
 		await interaction.response.send_message(f'I need the permission to send messages in {verify_channel.mention}.', ephemeral=True)
 		return
@@ -1021,12 +1024,11 @@ async def self(interaction: discord.Interaction, verify_channel: discord.TextCha
 	if not (bot_permissions.send_messages and bot_permissions.embed_links):
 		await interaction.response.send_message(f'I need the permission to send messages and embed links in {log_channel.mention}.', ephemeral=True)
 		return
-	if action == 'kick' or action == 'ban':
-		if not interaction.guild.me.guild_permissions.kick_members:
-			await interaction.response.send_message(f'I need the permission to {action} members.', ephemeral=True)
+	if ban_time is not None:
+		ban_time = timeparse(ban_time)
+		if ban_time is None:
+			await interaction.response.send_message('Invalid ban time. Please use the following format: `1d / 1h / 1m / 1s`.\nFor example: `1d2h3m4s`', ephemeral=True)
 			return
-	if action == '':
-		action = None
 	c.execute('INSERT OR REPLACE INTO servers VALUES (?, ?, ?, ?, ?, ?, ?)', (interaction.guild.id, verify_channel.id, verify_role.id, log_channel.id, timeout, action, ban_time))
 	conn.commit()
 	await interaction.response.send_message(f'Setup completed.\nYou can now run `/send_panel`, to send the panel to <#{verify_channel.id}>.', ephemeral=True)
