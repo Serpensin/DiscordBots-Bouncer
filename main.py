@@ -15,6 +15,7 @@ import sqlite3
 import string
 import sys
 import time
+import topgg
 from captcha.image import ImageCaptcha
 from datetime import timedelta, datetime
 from dotenv import load_dotenv
@@ -69,6 +70,8 @@ manlogger.info('Engine powering up...')
 TOKEN = os.getenv('TOKEN')
 ownerID = os.getenv('OWNER_ID')
 support_id = os.getenv('SUPPORT_SERVER')
+topgg_token = os.getenv('TOPGG_TOKEN')
+
 
 #Create activity.json if not exists
 class JSONValidator:
@@ -319,6 +322,9 @@ class aclient(discord.AutoShardedClient):
 		#Start background tasks
 		bot.loop.create_task(Functions.process_latest_joined())
 		bot.loop.create_task(Functions.check_and_process_temp_bans())
+		if topgg_token:
+			bot.topggpy = topgg.DBLClient(bot, topgg_token)
+			bot.loop.create_task(Functions.update_topgg())
 
 		shutdown = False
 		self.initialized = True
@@ -649,6 +655,15 @@ class Functions():
 			parts.append(f"{seconds}s")
 	
 		return " ".join(parts)
+
+
+	async def update_topgg():
+		while not shutdown:
+			await bot.topggpy.post_guild_count()
+			try:
+				await asyncio.sleep(60*30)
+			except asyncio.CancelledError:
+				pass
 
 
 
