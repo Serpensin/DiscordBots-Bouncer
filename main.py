@@ -234,6 +234,7 @@ class aclient(discord.AutoShardedClient):
 		if not self.initialized:
 			return
 		c.execute('DELETE FROM processing_joined WHERE guild_id = ? AND user_id = ?', (member.guild.id, member.id,))
+		conn.commit()
 
 
 	async def on_interaction(self, interaction: discord.Interaction):
@@ -401,8 +402,6 @@ class Functions():
 		class CaptchaInput(discord.ui.Modal, title = 'Verification'):
 			def __init__(self):
 				super().__init__()
-				#self.timeout = 60
-				#self.answer = discord.ui.TextInput(label = 'Please enter the captcha text:', placeholder = 'Captcha text', min_length = 6, max_length = 6, style = discord.TextStyle.short, required = True)
 				self.verification_successful = False
 
 			answer = discord.ui.TextInput(label = 'Please enter the captcha text:', placeholder = 'Captcha text', min_length = 6, max_length = 6, style = discord.TextStyle.short, required = True)	
@@ -412,6 +411,8 @@ class Functions():
 					await interaction.user.add_roles(interaction.guild.get_role(int(verified_role_id)))
 					await Functions.send_logging_message(interaction = interaction, kind = 'verify_success')
 					await interaction.response.edit_message(content = 'You have successfully verified yourself.', view = None)
+					c.execute('DELETE FROM processing_joined WHERE guild_id = ? AND user_id = ?', (interaction.guild.id, interaction.user.id,))
+					conn.commit()
 					if interaction.user.id in bot.captcha_timeout:
 						bot.captcha_timeout.remove(interaction.user.id)
 					self.verification_successful = True
