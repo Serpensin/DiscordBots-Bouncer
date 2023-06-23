@@ -1,5 +1,6 @@
 ﻿#Import
 print('Loading...')
+import aiohttp
 import asyncio
 import discord
 import io
@@ -44,7 +45,7 @@ log_folder = f'{app_folder_name}//Logs//'
 buffer_folder = f'{app_folder_name}//Buffer//'
 activity_file = os.path.join(app_folder_name, 'activity.json')
 db_file = os.path.join(app_folder_name, f'{bot_name}.db')
-bot_version = "1.0.1"
+bot_version = "1.0.2"
 
 #Logger init
 logger = logging.getLogger('discord')
@@ -658,7 +659,10 @@ class Functions():
 
 	async def update_topgg():
 		while not shutdown:
-			await bot.topggpy.post_guild_count()
+			try:
+				await bot.topggpy.post_guild_count()
+			except aiohttp.ServerDisconnectedError:
+				pass
 			try:
 				await asyncio.sleep(60*30)
 			except asyncio.CancelledError:
