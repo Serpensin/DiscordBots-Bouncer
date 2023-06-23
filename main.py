@@ -139,6 +139,7 @@ class aclient(discord.AutoShardedClient):
 		self.synced = False
 		self.db_conns = {}
 		self.captcha_timeout = [] 
+		self.initialized = False
 
 
 	class Presence():
