@@ -26,7 +26,7 @@ LABEL maintainer="Discord: the_devil_of_the_rhine (863687441809801246)"
 LABEL commit=$COMMIT
 LABEL description="Discord Bot for automatically assigning users a role after they complete a captcha."
 LABEL release=$BUILD_DATE
-LABEL VERSION="1.0.2"
+LABEL VERSION="1.1.0"
 LABEL url="https://gitlab.bloodygang.com/Serpensin/DiscordBots-Bouncer"
 
 CMD ["python3", "main.py"]

@@ -18,7 +18,7 @@ import sys
 import time
 import topgg
 from captcha.image import ImageCaptcha
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, timezone
 from dotenv import load_dotenv
 from pytimeparse.timeparse import timeparse
 from zipfile import ZIP_DEFLATED, ZipFile
@@ -45,7 +45,7 @@ log_folder = f'{app_folder_name}//Logs//'
 buffer_folder = f'{app_folder_name}//Buffer//'
 activity_file = os.path.join(app_folder_name, 'activity.json')
 db_file = os.path.join(app_folder_name, f'{bot_name}.db')
-bot_version = "1.0.2"
+bot_version = "1.1.0"
 
 #Logger init
 logger = logging.getLogger('discord')
@@ -133,7 +133,8 @@ class aclient(discord.AutoShardedClient):
 	
 		super().__init__(owner_id = ownerID,
 						  intents = intents,
-						  status = discord.Status.invisible
+						  status = discord.Status.invisible,
+						  auto_reconnect = True
 						)
 	
 		self.synced = False
@@ -220,10 +221,32 @@ class aclient(discord.AutoShardedClient):
 
 
 	async def on_member_join(self, member: discord.Member):
+		def account_age_in_seconds(member: discord.Member) -> int:
+			now = datetime.now(timezone.utc)
+			created = member.created_at
+			age = now - created
+			return age.total_seconds()
+
 		if not self.initialized:
 			return
 		if member.bot:
 			return
+		#Fetch account_age_min from DB and kick user if account age is less than account_age_min
+		c.execute('SELECT account_age_min FROM servers WHERE guild_id = ?', (member.guild.id,))
+		result = c.fetchone()
+		if result is None or result[0] is None:
+			return
+		account_age_min = result[0]
+		if account_age_in_seconds(member) < account_age_min:
+			try:
+				await member.kick(reason=f'Account age is less than {Functions.format_seconds(account_age_min)}.')
+				await Functions.send_logging_message(member = member, kind = 'account_too_young')
+				return
+			except discord.Forbidden:
+				return
+		else:
+			print(f'Account age is greater than {Functions.format_seconds(account_age_min)}.')
+
 		c.execute('SELECT action FROM servers WHERE guild_id = ?', (member.guild.id,))
 		result = c.fetchone()
 		if result is None or result[0] is None:
@@ -261,9 +284,17 @@ class aclient(discord.AutoShardedClient):
 					return
 			elif button_id == 'why':
 				await interaction.response.send_message(f'This serever is protected by <@!{bot.user.id}> to prevent raids & malicious users.\n\nTo gain access to this server, you\'ll need to verify yourself by completing a captcha.\n\nYou don\'t need to connect your account for that.', view = WhyView(), ephemeral=True)
-
+	
 
 	async def setup_database(self, shard_id):
+		def column_exists(conn, table, column_name):
+			c = conn.cursor()
+			c.execute(f'PRAGMA table_info({table})')
+			for col in c.fetchall():
+				if col[1] == column_name:
+					return True
+			return False
+
 		conn = sqlite3.connect(db_file)
 		c = conn.cursor()
 		c.executescript('''
@@ -294,6 +325,8 @@ class aclient(discord.AutoShardedClient):
 				join_time INTEGER
 			)
 		''')
+		if not column_exists(conn, 'servers', 'account_age_min'):
+			c.execute('ALTER TABLE servers ADD COLUMN account_age_min INTEGER')
 		self.db_conns[shard_id] = conn
 
 
@@ -410,11 +443,14 @@ class Functions():
 			
 			async def on_submit(self, interaction: discord.Interaction):
 				if self.answer.value.upper() == captcha_text:
-					await interaction.user.add_roles(interaction.guild.get_role(int(verified_role_id)))
-					await Functions.send_logging_message(interaction = interaction, kind = 'verify_success')
-					await interaction.response.edit_message(content = 'You have successfully verified yourself.', view = None)
-					c.execute('DELETE FROM processing_joined WHERE guild_id = ? AND user_id = ?', (interaction.guild.id, interaction.user.id,))
-					conn.commit()
+					try:
+						await interaction.user.add_roles(interaction.guild.get_role(int(verified_role_id)))
+						await Functions.send_logging_message(interaction = interaction, kind = 'verify_success')
+						await interaction.response.edit_message(content = 'You have successfully verified yourself.', view = None)
+						c.execute('DELETE FROM processing_joined WHERE guild_id = ? AND user_id = ?', (interaction.guild.id, interaction.user.id,))
+						conn.commit()
+					except discord.Forbidden:
+						await interaction.response.edit_message(content = 'I do not have the permission to add the verified role.', view = None)
 					if interaction.user.id in bot.captcha_timeout:
 						bot.captcha_timeout.remove(interaction.user.id)
 					self.verification_successful = True
@@ -599,6 +635,7 @@ class Functions():
 			if log_channel is None:
 				return
 		ban_time = row[6]
+		account_age = row[7]
 
 		if kind == 'verify_start':
 			embed = discord.Embed(title = 'Captcha sent', description = f'User {interaction.user.mention} requested a new captcha.', color = discord.Color.blurple())
@@ -638,14 +675,21 @@ class Functions():
 			embed = discord.Embed(title = 'Unban', description = f'User {member.mention} was unbanned.', color = discord.Color.green())
 			embed.timestamp = datetime.utcnow()
 			await log_channel.send(embed = embed)
+		elif kind == 'account_too_young':
+			embed = discord.Embed(title = 'Account too young', description = f'User {member.mention} was kicked because their account is youger than {Functions.format_seconds(account_age)}.', color = discord.Color.orange())
+			embed.timestamp = datetime.utcnow()
+			await log_channel.send(embed = embed)
 
 
 	def format_seconds(seconds):
-		days, remainder = divmod(seconds, 86400)
+		years, remainder = divmod(seconds, 31536000)
+		days, remainder = divmod(remainder, 86400)
 		hours, remainder = divmod(remainder, 3600)
 		minutes, seconds = divmod(remainder, 60)
 		
 		parts = []
+		if years:
+			parts.append(f"{years}y")
 		if days:
 			parts.append(f"{days}d")
 		if hours:
@@ -654,7 +698,7 @@ class Functions():
 			parts.append(f"{minutes}m")
 		if seconds:
 			parts.append(f"{seconds}s")
-	
+		
 		return " ".join(parts)
 
 
@@ -992,7 +1036,8 @@ async def self(interaction: discord.Interaction):
 							   log_channel = 'Channel used to send logs.',
 							   timeout = 'After that timeframe the action gets executed.', 
 							   action = 'Action that gets executed after timeout.',
-							   ban_time = 'Time a user gets banned for if action is ban. Leave empty for perma ban. (1d / 1h / 1m / 1s)')
+							   ban_time = 'Time a user gets banned for if action is ban. Leave empty for perma ban. (1d / 1h / 1m / 1s)',
+							   account_age = 'Account age required to join the server.')
 @discord.app_commands.choices(timeout = [
 	discord.app_commands.Choice(name = '5 Minutes', value = 300),
 	discord.app_commands.Choice(name = '10 Minutes', value = 600),
@@ -1006,7 +1051,7 @@ async def self(interaction: discord.Interaction):
 	discord.app_commands.Choice(name = 'Ban', value = 'ban'),
 	discord.app_commands.Choice(name = 'Nothing', value = '')
 	])
-async def self(interaction: discord.Interaction, verify_channel: discord.TextChannel, verify_role: discord.Role, log_channel: discord.TextChannel, timeout: int, action: str, ban_time: str = None):
+async def self(interaction: discord.Interaction, verify_channel: discord.TextChannel, verify_role: discord.Role, log_channel: discord.TextChannel, timeout: int, action: str, ban_time: str = None, account_age: str = None):
 	if action == 'kick':
 		if not interaction.guild.me.guild_permissions.kick_members:
 			await interaction.response.send_message(f'I need the permission to {action} members.', ephemeral=True)
@@ -1035,7 +1080,15 @@ async def self(interaction: discord.Interaction, verify_channel: discord.TextCha
 		if ban_time is None:
 			await interaction.response.send_message('Invalid ban time. Please use the following format: `1d / 1h / 1m / 1s`.\nFor example: `1d2h3m4s`', ephemeral=True)
 			return
-	c.execute('INSERT OR REPLACE INTO servers VALUES (?, ?, ?, ?, ?, ?, ?)', (interaction.guild.id, verify_channel.id, verify_role.id, log_channel.id, timeout, action, ban_time))
+	if account_age is not None:
+		if not interaction.guild.me.guild_permissions.kick_members:
+			await interaction.response.send_message(f'I need the permission to kick members.', ephemeral=True)
+			return
+		account_age = timeparse(account_age)
+		if account_age is None:
+			await interaction.response.send_message('Invalid account age. Please use the following format: `1d / 1h / 1m / 1s`.\nFor example: `1d2h3m4s`', ephemeral=True)
+			return
+	c.execute('INSERT OR REPLACE INTO servers VALUES (?, ?, ?, ?, ?, ?, ?, ?)', (interaction.guild.id, verify_channel.id, verify_role.id, log_channel.id, timeout, action, ban_time, account_age,))
 	conn.commit()
 	await interaction.response.send_message(f'Setup completed.\nYou can now run `/send_panel`, to send the panel to <#{verify_channel.id}>.', ephemeral=True)
 
@@ -1054,8 +1107,10 @@ async def self(interaction: discord.Interaction):
 		log_channel = data[3]
 		timeout = data[4]
 		action = data[5]
+		ban_time = data[6]
+		account_age = data[7]
 		embed = discord.Embed(title = 'Current settings',
-							  description = f'**Verify Channel:** <#{verify_channel}>\n**Verify Role:** <@&{verify_role}>\n**Log Channel:** <#{log_channel}>\n**Timeout:** {Functions.format_seconds(timeout)}\n**Action:** {action}',
+							  description = f'**Verify Channel:** <#{verify_channel}>\n**Verify Role:** <@&{verify_role}>\n**Log Channel:** <#{log_channel}>\n**Timeout:** {Functions.format_seconds(timeout)}\n**Action:** {action}\n**Banned for:** {(Functions.format_seconds(ban_time) if ban_time is not None else None)}\n**Min account age:** {(Functions.format_seconds(account_age) if account_age is not None else None)}',
 							  color = 0x2b63b0)
 		await interaction.response.send_message(embed = embed, ephemeral=True)
 	else:
