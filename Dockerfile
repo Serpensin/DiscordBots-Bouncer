@@ -15,13 +15,10 @@ ARG COMMIT
 RUN python -m pip install --upgrade pip \
     && pip install --upgrade setuptools \
     && apk add --no-cache jpeg-dev zlib-dev libjpeg \
-    && if [ "$TARGETPLATFORM" = "linux/arm/v6" ] || [ "$TARGETPLATFORM" = "linux/arm/v7" ]; then \
-        apk add --no-cache --virtual .build-deps gcc musl-dev python3-dev \
-        && pip install -r requirements.txt \
-        && apk del .build-deps; \
-    else \
-        pip install -r requirements.txt; \
-    fi \
+    && apk add --no-cache --virtual .build-deps gcc musl-dev python3-dev \
+    && pip install Pillow \
+    && pip install -r requirements.txt \
+    && apk del .build-deps \
     && find /usr/local \
         \( -type d -a -name test -o -name tests \) \
         -o \( -type f -a -name '*.pyc' -o -name '*.pyo' \) \
