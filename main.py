@@ -33,7 +33,7 @@ sentry_sdk.init(
     dsn=os.getenv('SENTRY_DSN'),
     traces_sample_rate=1.0,
     profiles_sample_rate=1.0,
-    environment='Development'
+    environment='Production'
 )
 app_folder_name = 'Bouncer'
 bot_name = 'Bouncer'
