@@ -1,4 +1,4 @@
-FROM python:3.9.16-alpine
+FROM python:3.9.17-alpine
 
 WORKDIR /app
 
@@ -16,7 +16,7 @@ RUN python -m pip install --upgrade pip \
     && pip install --upgrade setuptools \
     && apk add --no-cache jpeg-dev zlib-dev libjpeg \
     && apk add --no-cache --virtual .build-deps gcc musl-dev python3-dev \
-    && pip install Pillow \
+    && pip install Pillow==9.5.0 \
     && pip install -r requirements.txt \
     && apk del .build-deps \
     && find /usr/local \
