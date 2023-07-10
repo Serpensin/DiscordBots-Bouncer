@@ -12,13 +12,13 @@ ARG TARGETPLATFORM
 ARG BUILD_DATE
 ARG COMMIT
 
-RUN python -m pip install --upgrade pip \
-RUN pip install --upgrade setuptools \
-RUN apk add --no-cache jpeg-dev zlib-dev libjpeg \
-RUN apk add --no-cache --virtual .build-deps gcc musl-dev python3-dev \
-RUN pip install Pillow==9.5.0 \
-RUN pip install -r requirements.txt \
-RUN apk del .build-deps \
+RUN python -m pip install --upgrade pip
+RUN pip install --upgrade setuptools
+RUN apk add --no-cache jpeg-dev zlib-dev libjpeg
+RUN apk add --no-cache --virtual .build-deps gcc musl-dev python3-dev
+RUN pip install Pillow==9.5.0
+RUN pip install -r requirements.txt
+RUN apk del .build-deps
 RUN find /usr/local \
      \( -type d -a -name test -o -name tests \) \
      -o \( -type f -a -name '*.pyc' -o -name '*.pyo' \) \
