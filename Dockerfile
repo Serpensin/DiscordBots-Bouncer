@@ -12,12 +12,12 @@ ARG TARGETPLATFORM
 ARG BUILD_DATE
 ARG COMMIT
 
-RUN apk update
-RUN apk add --no-cache --virtual .build-deps gcc musl-dev python3-dev jpeg-dev zlib-dev libjpeg rust cargo
-RUN python -m pip install --upgrade pip setuptools
-RUN pip install Pillow==9.5.0
-RUN pip install -r requirements.txt
-RUN apk del .build-deps && \
+RUN apk update && \
+    apk add --no-cache --virtual .build-deps gcc musl-dev python3-dev jpeg-dev zlib-dev libjpeg rust cargo && \
+    python -m pip install --upgrade pip setuptools && \
+    pip install Pillow==9.5.0 && \
+    pip install -r requirements.txt && \
+    apk del .build-deps && \
     find /usr/local \
       \( -type d -a \( -name test -o -name tests \) \) \
       -o \( -type f -a \( -name '*.pyc' -o -name '*.pyo' \) \) \
