@@ -12,7 +12,7 @@ ARG TARGETPLATFORM
 ARG BUILD_DATE
 ARG COMMIT
 
-RUN apk update && \
+RUN apk update
 RUN apk add --no-cache --virtual .build-deps gcc musl-dev python3-dev jpeg-dev zlib-dev libjpeg rust cargo
 RUN python -m pip install --upgrade pip setuptools
 RUN pip install Pillow==9.5.0
