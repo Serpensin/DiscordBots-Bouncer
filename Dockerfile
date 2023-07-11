@@ -14,8 +14,7 @@ ARG COMMIT
 
 RUN python -m pip install --upgrade pip \
     && pip install --upgrade setuptools \
-    && apk add --no-cache jpeg-dev zlib-dev libjpeg \
-    && apk add --no-cache .build-deps gcc musl-dev python3-dev \
+    && apk add --no-cache .build-deps gcc musl-dev python3-dev jpeg-dev zlib-dev libjpeg \
     && pip install Pillow==9.5.0 \
     && pip install -r requirements.txt \
     && apk del .build-deps \
