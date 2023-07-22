@@ -71,6 +71,7 @@ TOKEN = os.getenv('TOKEN')
 ownerID = os.getenv('OWNER_ID')
 support_id = os.getenv('SUPPORT_SERVER')
 topgg_token = os.getenv('TOPGG_TOKEN')
+discordlist_token = os.getenv('DISCORDLIST_TOKEN')
 
 
 #Create activity.json if not exists
@@ -341,6 +342,45 @@ class aclient(discord.AutoShardedClient):
         self.db_conns[shard_id] = conn
 
 
+    async def on_message(self, message):
+        async def __wrong_selection():
+            await message.channel.send('```'
+                                       'Commands:\n'
+                                       'help - Shows this message\n'
+                                       'log - Get the log\n'
+                                       'activity - Set the activity of the bot\n'
+                                       'status - Set the status of the bot\n'
+                                       'shutdown - Shutdown the bot\n'
+                                       '```')
+
+        if message.guild is None and message.author.id == int(ownerID):
+            args = message.content.split(' ')
+            print(args)
+            command, *args = args
+            if command == 'help':
+                await __wrong_selection()
+                return
+
+            elif command == 'log':
+                await Owner.log(message, args)
+                return
+
+            elif command == 'activity':
+                await Owner.activity(message, args)
+                return
+
+            elif command == 'status':
+                await Owner.status(message, args)
+                return
+
+            elif command == 'shutdown':
+                Owner.shutdown(message)
+                return
+
+            else:
+                await __wrong_selection()
+
+
     async def on_ready(self):
         global owner, start_time, conn, c, shutdown
         shard_id = self.shard_info.id if hasattr(self, 'shard_info') else 0
@@ -371,6 +411,8 @@ class aclient(discord.AutoShardedClient):
         bot.loop.create_task(Functions.check_and_process_temp_bans())
         if topgg_token:
             bot.loop.create_task(update_stats.topgg())
+        if discordlist_token:
+            bot.loop.create_task(update_stats.discordlist())
 
         shutdown = False
         self.initialized = True
@@ -419,6 +461,23 @@ class update_stats():
                 await asyncio.sleep(60*30)
             except asyncio.CancelledError:
                 pass
+
+
+    async def discordlist():
+        headers = {
+            'Authorization': f'Bearer {discordlist_token}',
+            'Content-Type': 'application/json; charset=utf-8'
+        }
+        while not shutdown:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(f'https://api.discordlist.gg/v0/bots/{bot.user.id}/guilds', headers=headers, json={"count": len(bot.guilds)}) as resp:
+                    if resp.status != 200:
+                        manlogger.error(f'Failed to update discordlist.gg: {resp.status} {resp.reason}')
+            try:
+                await asyncio.sleep(60*30)
+            except asyncio.CancelledError:
+                pass
+
 
 
 #Functions
@@ -732,82 +791,31 @@ class Functions():
 
 
 ##Owner Commands
-#Shutdown
-@tree.command(name = 'shutdown', description = 'Safely shut down the bot.')
-async def self(interaction: discord.Interaction):
-    if interaction.user.id == int(ownerID):
-        global shutdown
-        shutdown = True
-        manlogger.info('Engine powering down...')
-        await interaction.response.send_message('Engine powering down...', ephemeral=True)
-        await bot.change_presence(status=discord.Status.invisible)
-        
-        tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
-        [task.cancel() for task in tasks]
-        await asyncio.gather(*tasks, return_exceptions=True)
+class Owner():
+    async def log(message, args):
+        async def __wrong_selection():
+            await message.channel.send('```'
+                                       'log [current/folder/lines] (Replace lines with a positive number, if you only want lines.) - Get the log\n'
+                                       '```')
 
-        conn.commit()
-        conn.close()
-        await bot.close()
-    else:
-        await interaction.response.send_message('Only the BotOwner can use this command!', ephemeral=True)
-
-
-#Get Logs
-@tree.command(name = 'get_logs', description = 'Get the current, or all logfiles.')
-@discord.app_commands.describe(choice = 'Choose which log files you want to receive.')
-@discord.app_commands.choices(choice = [
-    discord.app_commands.Choice(name="Last X lines", value="xlines"),
-    discord.app_commands.Choice(name="Current Log", value="current"),
-    discord.app_commands.Choice(name="Whole Folder", value="whole")
-])
-async def self(interaction: discord.Interaction, choice: str):
-    if interaction.user.id != int(ownerID):
-        await interaction.response.send_message('Only the BotOwner can use this command!', ephemeral = True)
-        return
-    else:
-        if choice == 'xlines':
-            class LastXLines(discord.ui.Modal, title = 'Line Input'):
-                def __init__(self, interaction):
-                    super().__init__()
-                    self.timeout = 15
-                    self.answer = discord.ui.TextInput(label = 'How many lines?', style = discord.TextStyle.short, required = True, min_length = 1, max_length = 4)
-                    self.add_item(self.answer)
-
-                async def on_submit(self, interaction: discord.Interaction):
-                    try:
-                        int(self.answer.value)
-                    except:
-                        await interaction.response.send_message(content = 'You can only use numbers!', ephemeral = True)
-                        return
-                    if int(self.answer.value) == 0:
-                        await interaction.response.send_message(content = 'You can not use 0 as a number!', ephemeral = True)
-                        return
-                    with open(f'{log_folder}{bot_name}.log', 'r', encoding='utf8') as f:
-                        with open(buffer_folder+'log-lines.txt', 'w', encoding='utf8') as f2:
-                            count = 0
-                            for line in (f.readlines()[-int(self.answer.value):]):
-                                f2.write(line)
-                                count += 1
-                    await interaction.response.send_message(content = f'Here are the last {count} lines of the current logfile:', file = discord.File(r''+buffer_folder+'log-lines.txt') , ephemeral = True)
-                    if os.path.exists(buffer_folder+'log-lines.txt'):
-                        os.remove(buffer_folder+'log-lines.txt')
-            await interaction.response.send_modal(LastXLines(interaction))
-        elif choice == 'current':
-            await interaction.response.defer(ephemeral = True)
+        if args == []:
+            await __wrong_selection()
+            return
+        if args[0] == 'current':
             try:
-                await interaction.followup.send(file=discord.File(r''f'{log_folder}{bot_name}.log'), ephemeral=True)
+                await message.channel.send(file=discord.File(r''+log_folder+'Bouncer.log'))
             except discord.HTTPException as err:
                 if err.status == 413:
                     with ZipFile(buffer_folder+'Logs.zip', mode='w', compression=ZIP_DEFLATED, compresslevel=9, allowZip64=True) as f:
-                        f.write(f'{log_folder}{bot_name}.log')
+                        f.write(log_folder+'Bouncer.log')
                     try:
-                        await interaction.response.send_message(file=discord.File(r''+buffer_folder+'Logs.zip'))
+                        await message.channel.send(file=discord.File(r''+buffer_folder+'Logs.zip'))
                     except discord.HTTPException as err:
                         if err.status == 413:
-                            await interaction.followup.send("The log is too big to be send directly.\nYou have to look at the log in your server(VPS).")
+                            await message.channel.send("The log is too big to be send directly.\nYou have to look at the log in your server (VPS).")
                     os.remove(buffer_folder+'Logs.zip')
-        elif choice == 'whole':
+                    return
+        elif args[0] == 'folder':
             if os.path.exists(buffer_folder+'Logs.zip'):
                 os.remove(buffer_folder+'Logs.zip')
             with ZipFile(buffer_folder+'Logs.zip', mode='w', compression=ZIP_DEFLATED, compresslevel=9, allowZip64=True) as f:
@@ -816,73 +824,123 @@ async def self(interaction: discord.Interaction, choice: str):
                         continue
                     f.write(log_folder+file)
             try:
-                await interaction.response.send_message(file=discord.File(r''+buffer_folder+'Logs.zip'), ephemeral=True)
+                await message.channel.send(file=discord.File(r''+buffer_folder+'Logs.zip'))
             except discord.HTTPException as err:
                 if err.status == 413:
-                    await interaction.followup.send("The folder is too big to be send directly.\nPlease get the current file, or the last X lines.")
+                    await message.channel.send("The folder is too big to be send directly.\nPlease get the current file, or the last X lines.")
             os.remove(buffer_folder+'Logs.zip')
+            return
+        else:
+            try:
+                if int(args[0]) < 1:
+                    await __wrong_selection()
+                    return
+                else:
+                    lines = int(args[0])
+            except ValueError:
+                await __wrong_selection()
+                return
+            with open(log_folder+'Bouncer.log', 'r', encoding='utf8') as f:
+                with open(buffer_folder+'log-lines.txt', 'w', encoding='utf8') as f2:
+                    count = 0
+                    for line in (f.readlines()[-lines:]):
+                        f2.write(line)
+                        count += 1
+            await message.channel.send(content = f'Here are the last {count} lines of the current logfile:', file = discord.File(r''+buffer_folder+'log-lines.txt'))
+            if os.path.exists(buffer_folder+'log-lines.txt'):
+                os.remove(buffer_folder+'log-lines.txt')
+            return
 
 
-#Change Activity
-@tree.command(name = 'activity', description = 'Change my activity.')
-@discord.app_commands.describe(type='The type of Activity you want to set.', title='What you want the bot to play, stream, etc...', url='Url of the stream. Only used if activity set to \'streaming\'.')
-@discord.app_commands.choices(type=[
-    discord.app_commands.Choice(name='Competing', value='Competing'),
-    discord.app_commands.Choice(name='Listening', value='Listening'),
-    discord.app_commands.Choice(name='Playing', value='Playing'),
-    discord.app_commands.Choice(name='Streaming', value='Streaming'),
-    discord.app_commands.Choice(name='Watching', value='Watching')
-    ])
-async def self(interaction: discord.Interaction, type: str, title: str, url: str = ''):
-    if interaction.user.id == int(ownerID):
-        await interaction.response.defer(ephemeral = True)
-        with open(activity_file) as f:
+    async def activity(message, args):
+        async def __wrong_selection():
+            await message.channel.send('```'
+                                       'activity [playing/streaming/listening/watching/competing] [title] (url) - Set the activity of the bot\n'
+                                       '```')
+
+        if args == []:
+            await __wrong_selection()
+            return
+        action = args[0].lower()
+        title = args[1]
+        try:
+            url = args[2]
+        except IndexError:
+            url = ''
+        print(title)
+        print(url)
+        with open(activity_file, 'r', encoding='utf8') as f:
             data = json.load(f)
-        if type == 'Playing':
+        if action == 'playing':
             data['activity_type'] = 'Playing'
             data['activity_title'] = title
-        elif type == 'Streaming':
+            data['activity_url'] = ''
+        elif action == 'streaming':
             data['activity_type'] = 'Streaming'
             data['activity_title'] = title
             data['activity_url'] = url
-        elif type == 'Listening':
+        elif action == 'listening':
             data['activity_type'] = 'Listening'
             data['activity_title'] = title
-        elif type == 'Watching':
+            data['activity_url'] = ''
+        elif action == 'watching':
             data['activity_type'] = 'Watching'
             data['activity_title'] = title
-        elif type == 'Competing':
+            data['activity_url'] = ''
+        elif action == 'competing':
             data['activity_type'] = 'Competing'
             data['activity_title'] = title
+            data['activity_url'] = ''
+        else:
+            await __wrong_selection()
+            return
         with open(activity_file, 'w', encoding='utf8') as f:
             json.dump(data, f, indent=2)
         await bot.change_presence(activity = bot.Presence.get_activity(), status = bot.Presence.get_status())
-        await interaction.followup.send('Activity changed!', ephemeral = True)
-    else:
-        await interaction.followup.send('Only the BotOwner can use this command!', ephemeral = True)
+        await message.channel.send(f'Activity set to {action} {title}{" " + url if url else ""}.')
 
 
-#Change Status
-@tree.command(name = 'status', description = 'Change my status.')
-@discord.app_commands.describe(status='The status you want to set.')
-@discord.app_commands.choices(status=[
-    discord.app_commands.Choice(name='Online', value='online'),
-    discord.app_commands.Choice(name='Idle', value='idle'),
-    discord.app_commands.Choice(name='Do not disturb', value='dnd'),
-    discord.app_commands.Choice(name='Invisible', value='invisible')
-    ])
-async def self(interaction: discord.Interaction, status: str):
-    if interaction.user.id == int(ownerID):
-        await interaction.response.defer(ephemeral = True)
-        with open(activity_file) as f:
+    async def status(message, args):
+        async def __wrong_selection():
+            await message.channel.send('```'
+                                       'status [online/idle/dnd/invisible] - Set the status of the bot\n'
+                                       '```')
+
+        if args == []:
+            await __wrong_selection()
+            return
+        action = args[0].lower()
+        with open(activity_file, 'r', encoding='utf8') as f:
             data = json.load(f)
-        data['status'] = status
+        if action == 'online':
+            data['status'] = 'online'
+        elif action == 'idle':
+            data['status'] = 'idle'
+        elif action == 'dnd':
+            data['status'] = 'dnd'
+        elif action == 'invisible':
+            data['status'] = 'invisible'
+        else:
+            await __wrong_selection()
+            return
         with open(activity_file, 'w', encoding='utf8') as f:
             json.dump(data, f, indent=2)
         await bot.change_presence(activity = bot.Presence.get_activity(), status = bot.Presence.get_status())
-        await interaction.followup.send('Status changed!', ephemeral = True)
-    else:
-        await interaction.followup.send('Only the BotOwner can use this command!', ephemeral = True)
+        await message.channel.send(f'Status set to {action}.')
+
+
+    async def shutdown(message):
+        global shutdown
+        manlogger.info('Engine powering down...')
+        await message.channel.send('Engine powering down...')
+        await bot.change_presence(status=discord.Status.invisible)
+        shutdown = True
+
+        tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+        [task.cancel() for task in tasks]
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+        await bot.close()
 
 
 
