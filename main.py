@@ -72,6 +72,7 @@ ownerID = os.getenv('OWNER_ID')
 support_id = os.getenv('SUPPORT_SERVER')
 topgg_token = os.getenv('TOPGG_TOKEN')
 discordlist_token = os.getenv('DISCORDLIST_TOKEN')
+discordbots_token = os.getenv('DISCORDBOTS_TOKEN')
 
 
 #Create activity.json if not exists
@@ -473,6 +474,22 @@ class update_stats():
                 async with session.post(f'https://api.discordlist.gg/v0/bots/{bot.user.id}/guilds', headers=headers, json={"count": len(bot.guilds)}) as resp:
                     if resp.status != 200:
                         manlogger.error(f'Failed to update discordlist.gg: {resp.status} {resp.reason}')
+            try:
+                await asyncio.sleep(60*30)
+            except asyncio.CancelledError:
+                pass
+
+
+    async def discordbots():
+        headers = {
+            'Authorization': discordbots_token,
+            'Content-Type': 'application/json'
+        }
+        while not shutdown:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(f'https://discord.bots.gg/api/v1/bots/{bot.user.id}/stats', headers=headers, json={'guildCount': len(bot.guilds), 'shardCount': len(bot.shards)}) as resp:
+                    if resp.status != 200:
+                        manlogger.error(f'Failed to update discord.bots.gg: {resp.status} {resp.reason}')
             try:
                 await asyncio.sleep(60*30)
             except asyncio.CancelledError:
