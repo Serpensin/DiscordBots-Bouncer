@@ -16,7 +16,6 @@ import sqlite3
 import string
 import sys
 import time
-import topgg
 from captcha.image import ImageCaptcha
 from datetime import timedelta, datetime, timezone
 from dotenv import load_dotenv
@@ -45,7 +44,7 @@ log_folder = f'{app_folder_name}//Logs//'
 buffer_folder = f'{app_folder_name}//Buffer//'
 activity_file = os.path.join(app_folder_name, 'activity.json')
 db_file = os.path.join(app_folder_name, f'{bot_name}.db')
-bot_version = "1.1.1"
+bot_version = "1.1.2"
 
 #Logger init
 logger = logging.getLogger('discord')
@@ -371,8 +370,7 @@ class aclient(discord.AutoShardedClient):
         bot.loop.create_task(Functions.process_latest_joined())
         bot.loop.create_task(Functions.check_and_process_temp_bans())
         if topgg_token:
-            bot.topggpy = topgg.DBLClient(bot, topgg_token)
-            bot.loop.create_task(Functions.update_topgg())
+            bot.loop.create_task(update_stats.topgg())
 
         shutdown = False
         self.initialized = True
@@ -403,6 +401,24 @@ def clear():
     else:
         os.system('clear')
 
+
+
+#Update botstats on websites
+class update_stats():
+    async def topgg():
+        headers = {
+            'Authorization': topgg_token,
+            'Content-Type': 'application/json'
+        }
+        while not shutdown:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(f'https://top.gg/api/bots/{bot.user.id}/stats', headers=headers, json={'server_count': len(bot.guilds), 'shard_count': len(bot.shards)}) as resp:
+                    if resp.status != 200:
+                        manlogger.error(f'Failed to update top.gg: {resp.status} {resp.reason}')
+            try:
+                await asyncio.sleep(60*30)
+            except asyncio.CancelledError:
+                pass
 
 
 #Functions
@@ -712,18 +728,6 @@ class Functions():
             parts.append(f"{seconds}s")
         
         return " ".join(parts)
-
-
-    async def update_topgg():
-        while not shutdown:
-            try:
-                await bot.topggpy.post_guild_count()
-            except aiohttp.ServerDisconnectedError:
-                pass
-            try:
-                await asyncio.sleep(60*30)
-            except asyncio.CancelledError:
-                pass
 
 
 
