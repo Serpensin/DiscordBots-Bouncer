@@ -1,4 +1,4 @@
-# Discord Bouncer [![Discord Bot Invite](https://img.shields.io/badge/Invite-Bouncer-blue)](https://discord.com/api/oauth2/authorize?client_id=1117844197005869259&permissions=268519430&scope=bot%20applications.commands)
+# Discord Bouncer [![Discord Bot Invite](https://img.shields.io/badge/Invite-blue)](https://discord.com/api/oauth2/authorize?client_id=1117844197005869259&permissions=268519430&scope=bot)[![Discord Bots](https://top.gg/api/widget/servers/1117844197005869259.svg)](https://top.gg/bot/1117844197005869259)
 
 **Force users to solve a captcha to get access to the server!**
 
