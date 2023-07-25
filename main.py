@@ -44,7 +44,7 @@ log_folder = f'{app_folder_name}//Logs//'
 buffer_folder = f'{app_folder_name}//Buffer//'
 activity_file = os.path.join(app_folder_name, 'activity.json')
 db_file = os.path.join(app_folder_name, f'{bot_name}.db')
-bot_version = "1.1.2"
+bot_version = "1.2.0"
 
 #Logger init
 logger = logging.getLogger('discord')
@@ -75,6 +75,7 @@ discordlist_token = os.getenv('DISCORDLIST_TOKEN')
 discordbots_token = os.getenv('DISCORDBOTS_TOKEN')
 discordbotlistcom_token = os.getenv('DISCORDBOTLIST_TOKEN')
 discords_token = os.getenv('DISCORDS_TOKEN')
+heartbeat_url = os.getenv('HEARTBEAT_URL')
 
 
 #Create activity.json if not exists
@@ -420,6 +421,8 @@ class aclient(discord.AutoShardedClient):
             bot.loop.create_task(update_stats.discordbotlist_com())
         if discords_token:
             bot.loop.create_task(update_stats.discords())
+        if heartbeat_url:
+            bot.loop.create_task(Functions.heartbeat())
 
         shutdown = False
         self.initialized = True
@@ -537,6 +540,18 @@ class update_stats():
 
 #Functions
 class Functions():
+    async def heartbeat():
+        while not shutdown:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(heartbeat_url) as r:
+                    if r.status != 200:
+                        manlogger.error(f'Heartbeat failed with status {r.status}')
+            try:
+                await asyncio.sleep(20)
+            except asyncio.CancelledError:
+                pass
+
+
     def create_captcha():
         captcha_text = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(6))
         data = image_captcha.generate(captcha_text)
