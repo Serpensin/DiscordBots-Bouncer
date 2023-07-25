@@ -44,7 +44,7 @@ log_folder = f'{app_folder_name}//Logs//'
 buffer_folder = f'{app_folder_name}//Buffer//'
 activity_file = os.path.join(app_folder_name, 'activity.json')
 db_file = os.path.join(app_folder_name, f'{bot_name}.db')
-bot_version = "1.2.0"
+bot_version = "1.2.1"
 
 #Logger init
 logger = logging.getLogger('discord')
@@ -74,6 +74,7 @@ topgg_token = os.getenv('TOPGG_TOKEN')
 discordlist_token = os.getenv('DISCORDLIST_TOKEN')
 discordbots_token = os.getenv('DISCORDBOTS_TOKEN')
 discordbotlistcom_token = os.getenv('DISCORDBOTLIST_TOKEN')
+discordbotlisteu_token = os.getenv('DISCORDBOTLISTEU_TOKEN')
 discords_token = os.getenv('DISCORDS_TOKEN')
 heartbeat_url = os.getenv('HEARTBEAT_URL')
 
@@ -421,6 +422,8 @@ class aclient(discord.AutoShardedClient):
             bot.loop.create_task(update_stats.discordbotlist_com())
         if discords_token:
             bot.loop.create_task(update_stats.discords())
+        if discordbotlisteu_token:
+            bot.loop.create_task(update_stats.discordbotlist_eu())
         if heartbeat_url:
             bot.loop.create_task(Functions.heartbeat())
 
@@ -535,6 +538,23 @@ class update_stats():
                 await asyncio.sleep(60*30)
             except asyncio.CancelledError:
                 pass
+
+
+    async def discordbotlist_eu():
+        headers = {
+            'Authorization': f'Bearer {discordbotlisteu_token}',
+            'Content-Type': 'application/json; charset=utf-8'
+        }
+        while not shutdown:
+            async with aiohttp.ClientSession() as session:
+                async with session.patch(f'https://api.discord-botlist.eu/v1/update', headers=headers, json={"serverCount": len(bot.guilds)}) as resp:
+                    if resp.status != 200:
+                        manlogger.error(f'Failed to update discordlist.gg: {resp.status} {resp.reason}')
+            try:
+                await asyncio.sleep(60*30)
+            except asyncio.CancelledError:
+                pass
+
 
 
 
