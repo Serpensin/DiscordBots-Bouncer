@@ -331,13 +331,13 @@ class aclient(discord.AutoShardedClient):
             );
         
             CREATE TABLE IF NOT EXISTS temp_bans (
-                guild_id INTEGER PRIMARY KEY,
+                guild_id INTEGER,
                 user_id INTEGER,
                 unban_time INTEGER
             );
 
             CREATE TABLE IF NOT EXISTS processing_joined (
-                guild_id INTEGER PRIMARY KEY,
+                guild_id INTEGER,
                 user_id INTEGER,
                 join_time INTEGER
             )
