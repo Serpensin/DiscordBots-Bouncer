@@ -189,7 +189,10 @@ class aclient(discord.AutoShardedClient):
             for option in options:
                 option_values += f"{option['name']}: {option['value']}"
         if isinstance(error, discord.app_commands.CommandOnCooldown):
-            await interaction.response.send_message(f'This command is on cooldown.\nTime left: `{str(timedelta(seconds=int(error.retry_after)))}`', ephemeral=True)
+            try:
+                await interaction.response.send_message(f'This command is on cooldown.\nTime left: `{str(timedelta(seconds=int(error.retry_after)))}`', ephemeral=True)
+            except discord.errors.NotFound:
+                pass
         else:
             try:
                 try:
@@ -628,6 +631,8 @@ class Functions():
                         conn.commit()
                     except discord.Forbidden:
                         await interaction.response.edit_message(content = 'I do not have the permission to add the verified role.', view = None)
+                    except discord.errors.NotFound:
+                        pass
                     if interaction.user.id in bot.captcha_timeout:
                         bot.captcha_timeout.remove(interaction.user.id)
                     self.verification_successful = True
