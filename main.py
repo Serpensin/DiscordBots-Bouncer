@@ -44,7 +44,7 @@ log_folder = f'{app_folder_name}//Logs//'
 buffer_folder = f'{app_folder_name}//Buffer//'
 activity_file = os.path.join(app_folder_name, 'activity.json')
 db_file = os.path.join(app_folder_name, f'{bot_name}.db')
-bot_version = "1.2.2"
+bot_version = "1.2.3"
 
 #Logger init
 logger = logging.getLogger('discord')
@@ -648,7 +648,7 @@ class Functions():
 
 
         class SubmitView(discord.ui.View):
-            def __init__(self, *, timeout=15):
+            def __init__(self, *, timeout=60):
                 super().__init__(timeout=timeout)
                 self.add_item(SubmitButton())
 
