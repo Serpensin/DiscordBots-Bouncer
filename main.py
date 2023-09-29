@@ -16,6 +16,7 @@ import sqlite3
 import string
 import sys
 import time
+from aiohttp import web
 from captcha.image import ImageCaptcha
 from datetime import timedelta, datetime, timezone
 from dotenv import load_dotenv
@@ -44,7 +45,7 @@ log_folder = f'{app_folder_name}//Logs//'
 buffer_folder = f'{app_folder_name}//Buffer//'
 activity_file = os.path.join(app_folder_name, 'activity.json')
 db_file = os.path.join(app_folder_name, f'{bot_name}.db')
-bot_version = "1.2.3"
+bot_version = "1.2.4"
 
 #Logger init
 logger = logging.getLogger('discord')
@@ -427,8 +428,7 @@ class aclient(discord.AutoShardedClient):
             bot.loop.create_task(update_stats.discords())
         if discordbotlisteu_token:
             bot.loop.create_task(update_stats.discordbotlist_eu())
-        if heartbeat_url:
-            bot.loop.create_task(Functions.heartbeat())
+        bot.loop.create_task(Functions.health_server())
 
         shutdown = False
         self.initialized = True
@@ -563,16 +563,16 @@ class update_stats():
 
 #Functions
 class Functions():
-    async def heartbeat():
-        while not shutdown:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(heartbeat_url) as r:
-                    if r.status != 200:
-                        manlogger.error(f'Heartbeat failed with status {r.status}')
-            try:
-                await asyncio.sleep(20)
-            except asyncio.CancelledError:
-                pass
+    async def health_server():
+        async def __health_check(request):
+            return web.Response(text="Healthy")
+
+        app = web.Application()
+        app.router.add_get('/health', __health_check)
+        runner = web.AppRunner(app)
+        await runner.setup()
+        site = web.TCPSite(runner, '0.0.0.0', 5000)
+        await site.start()
 
 
     def create_captcha():

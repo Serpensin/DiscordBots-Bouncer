@@ -68,6 +68,12 @@ docker run -d \
 -e OWNER_ID=DISCORD_ID_OF_OWNER \
 --name Bouncer \
 --restart any \
+--health-cmd="curl -f http://localhost:5000/health || exit 1" \
+--health-interval=30s \
+--health-timeout=10s \
+--health-retries=3 \
+--health-start-period=40s \
+-p 5000:5000 \
 -v bouncer:/app/Bouncer \
 serpensin/bouncer
 ```
