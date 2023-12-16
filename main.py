@@ -21,6 +21,7 @@ from captcha.image import ImageCaptcha
 from datetime import timedelta, datetime, timezone
 from dotenv import load_dotenv
 from pytimeparse.timeparse import timeparse
+from urllib.parse import urlparse
 from zipfile import ZIP_DEFLATED, ZipFile
 
 
@@ -45,7 +46,7 @@ log_folder = f'{app_folder_name}//Logs//'
 buffer_folder = f'{app_folder_name}//Buffer//'
 activity_file = os.path.join(app_folder_name, 'activity.json')
 db_file = os.path.join(app_folder_name, f'{bot_name}.db')
-bot_version = "1.2.4"
+bot_version = "1.2.5"
 
 #Logger init
 logger = logging.getLogger('discord')
@@ -77,7 +78,6 @@ discordbots_token = os.getenv('DISCORDBOTS_TOKEN')
 discordbotlistcom_token = os.getenv('DISCORDBOTLIST_TOKEN')
 discordbotlisteu_token = os.getenv('DISCORDBOTLISTEU_TOKEN')
 discords_token = os.getenv('DISCORDS_TOKEN')
-heartbeat_url = os.getenv('HEARTBEAT_URL')
 
 
 #Create activity.json if not exists
@@ -133,19 +133,19 @@ validator.validate_and_fix_json()
 #Bot Class
 class aclient(discord.AutoShardedClient):
     def __init__(self):
-    
+
         intents = discord.Intents.default()
         intents.members = True
-    
+
         super().__init__(owner_id = ownerID,
                           intents = intents,
                           status = discord.Status.invisible,
                           auto_reconnect = True
                         )
-    
+
         self.synced = False
         self.db_conns = {}
-        self.captcha_timeout = [] 
+        self.captcha_timeout = []
         self.initialized = False
 
 
@@ -283,7 +283,7 @@ class aclient(discord.AutoShardedClient):
 
         if interaction.data and interaction.data.get('component_type') == 2:  # 2 is the component type for button
             button_id = interaction.data.get('custom_id')
-        
+
             if button_id == 'verify':
                 if interaction.user.id in bot.captcha_timeout:
                     try:
@@ -305,7 +305,7 @@ class aclient(discord.AutoShardedClient):
                         await interaction.followup.send(f'This serever is protected by <@!{bot.user.id}> to prevent raids & malicious users.\n\nTo gain access to this server, you\'ll need to verify yourself by completing a captcha.\n\nYou don\'t need to connect your account for that.', view = WhyView(), ephemeral=True)
                     except discord.NotFound:
                         pass
-    
+
 
     async def setup_database(self, shard_id):
         def column_exists(conn, table, column_name):
@@ -328,12 +328,12 @@ class aclient(discord.AutoShardedClient):
                 action TEXT,
                 ban_time INTEGER
             );
-        
+
             CREATE TABLE IF NOT EXISTS panels (
                 guild_id INTEGER PRIMARY KEY,
                 panel_id INTEGER
             );
-        
+
             CREATE TABLE IF NOT EXISTS temp_bans (
                 guild_id INTEGER,
                 user_id INTEGER,
@@ -391,13 +391,16 @@ class aclient(discord.AutoShardedClient):
 
 
     async def on_ready(self):
+        if self.initialized:
+            await bot.change_presence(activity = self.Presence.get_activity(), status = self.Presence.get_status())
+            return
         global owner, start_time, conn, c, shutdown
         shard_id = self.shard_info.id if hasattr(self, 'shard_info') else 0
         #SQLite init
         conn = sqlite3.connect(db_file)
         c = conn.cursor()
         await self.setup_database(shard_id)
-        
+
         try:
             owner = await self.fetch_user(ownerID)
             if owner is None:
@@ -619,8 +622,8 @@ class Functions():
                 super().__init__()
                 self.verification_successful = False
 
-            answer = discord.ui.TextInput(label = 'Please enter the captcha text:', placeholder = 'Captcha text', min_length = 6, max_length = 6, style = discord.TextStyle.short, required = True)	
-            
+            answer = discord.ui.TextInput(label = 'Please enter the captcha text:', placeholder = 'Captcha text', min_length = 6, max_length = 6, style = discord.TextStyle.short, required = True)
+
             async def on_submit(self, interaction: discord.Interaction):
                 if self.answer.value.upper() == captcha_text:
                     try:
@@ -732,7 +735,7 @@ class Functions():
                                         c.execute('INSERT INTO temp_bans VALUES (?, ?, ?)', (guild.id, member.id, int(time.time() + ban_time)))
                                     else:
                                         await member.ban(reason=f'Did not successfully verify in time.')
-                                    await Functions.send_logging_message(member = member, kind = 'verify_ban')									
+                                    await Functions.send_logging_message(member = member, kind = 'verify_ban')
                                     manlogger.debug(f'Banned {member.name}#{member.discriminator} ({member.id}) from {guild.name} ({guild.id}).')
                                 except discord.Forbidden:
                                     manlogger.debug(f'Could not ban {member.name}#{member.discriminator} ({member.id}) from {guild.name} ({guild.id}).')
@@ -779,7 +782,7 @@ class Functions():
                         embed.timestamp = datetime.utcnow()
                         manlogger.debug(f'Unbanned {member.name}#{member.discriminator} ({member.id}) from {guild.name} ({guild.id}).')
                         c.execute('DELETE FROM temp_bans WHERE guild_id = ? AND user_id = ?', (temp_ban[0], temp_ban[1]))
-                        if log_channel is not None:	
+                        if log_channel is not None:
                             try:
                                 await log_channel.send(embed = embed)
                             except discord.Forbidden:
@@ -789,7 +792,7 @@ class Functions():
                 except Exception as e:
                     conn.commit()
                     raise e
-            
+
             conn.commit()
             try:
                 await asyncio.sleep(15)
@@ -868,7 +871,7 @@ class Functions():
         days, remainder = divmod(remainder, 86400)
         hours, remainder = divmod(remainder, 3600)
         minutes, seconds = divmod(remainder, 60)
-        
+
         parts = []
         if years:
             parts.append(f"{years}y")
@@ -880,7 +883,7 @@ class Functions():
             parts.append(f"{minutes}m")
         if seconds:
             parts.append(f"{seconds}s")
-        
+
         return " ".join(parts)
 
 
@@ -952,16 +955,25 @@ class Owner():
             await message.channel.send('```'
                                        'activity [playing/streaming/listening/watching/competing] [title] (url) - Set the activity of the bot\n'
                                        '```')
+        def isURL(zeichenkette):
+            try:
+                ergebnis = urlparse(zeichenkette)
+                return all([ergebnis.scheme, ergebnis.netloc])
+            except:
+                return False
+            
+        def remove_and_save(liste):
+            if liste and isURL(liste[-1]):
+                return liste.pop()
+            else:
+                return None
 
         if args == []:
             await __wrong_selection()
             return
         action = args[0].lower()
-        title = args[1]
-        try:
-            url = args[2]
-        except IndexError:
-            url = ''
+        url = remove_and_save(args[1:])
+        title = ' '.join(args[1:])
         print(title)
         print(url)
         with open(activity_file, 'r', encoding='utf8') as f:
@@ -1203,7 +1215,7 @@ async def self(interaction: discord.Interaction):
 @discord.app_commands.describe(verify_channel = 'Channel for the verification message.',
                                verify_role = 'Role assigned after successfull verification.',
                                log_channel = 'Channel used to send logs.',
-                               timeout = 'After that timeframe the action gets executed.', 
+                               timeout = 'After that timeframe the action gets executed.',
                                action = 'Action that gets executed after timeout.',
                                ban_time = 'Time a user gets banned for if action is ban. Leave empty for perma ban. (1d / 1h / 1m / 1s)',
                                account_age = 'Account age required to join the server.')
