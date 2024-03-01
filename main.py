@@ -46,7 +46,7 @@ log_folder = f'{app_folder_name}//Logs//'
 buffer_folder = f'{app_folder_name}//Buffer//'
 activity_file = os.path.join(app_folder_name, 'activity.json')
 db_file = os.path.join(app_folder_name, f'{bot_name}.db')
-bot_version = "1.2.6"
+bot_version = "1.3.0"
 
 #Logger init
 logger = logging.getLogger('discord')
@@ -961,7 +961,7 @@ class Owner():
                 return all([ergebnis.scheme, ergebnis.netloc])
             except:
                 return False
-            
+
         def remove_and_save(liste):
             if liste and isURL(liste[-1]):
                 return liste.pop()

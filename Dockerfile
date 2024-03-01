@@ -1,4 +1,4 @@
-FROM python:3.9.18-alpine
+FROM python:3.12.2-alpine
 
 WORKDIR /app
 
@@ -29,7 +29,7 @@ LABEL maintainer="Discord: the_devil_of_the_rhine (863687441809801246)" \
       commit=$COMMIT \
       description="Discord Bot for automatically assigning users a role after they complete a captcha." \
       release=$BUILD_DATE \
-      version="1.2.6" \
+      version="1.3.0" \
       url="https://gitlab.bloodygang.com/Serpensin/DiscordBots-Bouncer"
 
 CMD ["python3", "main.py"]
