@@ -2,6 +2,7 @@
 print('Loading...')
 import aiohttp
 import asyncio
+import datetime
 import discord
 import io
 import json
@@ -18,7 +19,6 @@ import sys
 import time
 from aiohttp import web
 from captcha.image import ImageCaptcha
-from datetime import timedelta, datetime, timezone
 from dotenv import load_dotenv
 from pytimeparse.timeparse import timeparse
 from urllib.parse import urlparse
@@ -46,7 +46,7 @@ log_folder = f'{app_folder_name}//Logs//'
 buffer_folder = f'{app_folder_name}//Buffer//'
 activity_file = os.path.join(app_folder_name, 'activity.json')
 db_file = os.path.join(app_folder_name, f'{bot_name}.db')
-bot_version = "1.3.0"
+bot_version = "1.3.1"
 
 #Logger init
 logger = logging.getLogger('discord')
@@ -191,7 +191,7 @@ class aclient(discord.AutoShardedClient):
                 option_values += f"{option['name']}: {option['value']}"
         if isinstance(error, discord.app_commands.CommandOnCooldown):
             try:
-                await interaction.response.send_message(f'This command is on cooldown.\nTime left: `{str(timedelta(seconds=int(error.retry_after)))}`', ephemeral=True)
+                await interaction.response.send_message(f'This command is on cooldown.\nTime left: `{str(datetime.timedelta(seconds=int(error.retry_after)))}`', ephemeral=True)
             except discord.errors.NotFound:
                 pass
         else:
@@ -231,7 +231,7 @@ class aclient(discord.AutoShardedClient):
 
     async def on_member_join(self, member: discord.Member):
         def account_age_in_seconds(member: discord.Member) -> int:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(datetime.timezone.utc)
             created = member.created_at
             age = now - created
             return age.total_seconds()
@@ -416,7 +416,7 @@ class aclient(discord.AutoShardedClient):
             manlogger.info('Synced.')
             self.synced = True
             await bot.change_presence(activity = self.Presence.get_activity(), status = self.Presence.get_status())
-        start_time = datetime.now()
+        start_time = datetime.datetime.now()
 
         #Start background tasks
         bot.loop.create_task(Functions.process_latest_joined())
@@ -431,6 +431,8 @@ class aclient(discord.AutoShardedClient):
             bot.loop.create_task(update_stats.discords())
         if discordbotlisteu_token:
             bot.loop.create_task(update_stats.discordbotlist_eu())
+        if discordbots_token:
+            bot.loop.create_task(update_stats.discordbots())
         bot.loop.create_task(Functions.health_server())
 
         shutdown = False
@@ -481,7 +483,6 @@ class update_stats():
             except asyncio.CancelledError:
                 pass
 
-
     async def discordlist():
         headers = {
             'Authorization': f'Bearer {discordlist_token}',
@@ -496,7 +497,6 @@ class update_stats():
                 await asyncio.sleep(60*30)
             except asyncio.CancelledError:
                 pass
-
 
     async def discordbots():
         headers = {
@@ -513,7 +513,6 @@ class update_stats():
             except asyncio.CancelledError:
                 pass
 
-
     async def discordbotlist_com():
         headers = {
             'Authorization': discordbotlistcom_token,
@@ -529,7 +528,6 @@ class update_stats():
             except asyncio.CancelledError:
                 pass
 
-
     async def discords():
         headers = {
             'Authorization': discords_token,
@@ -544,7 +542,6 @@ class update_stats():
                 await asyncio.sleep(60*30)
             except asyncio.CancelledError:
                 pass
-
 
     async def discordbotlist_eu():
         headers = {
@@ -577,12 +574,10 @@ class Functions():
         site = web.TCPSite(runner, '0.0.0.0', 5000)
         await site.start()
 
-
     def create_captcha():
         captcha_text = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(6))
         data = image_captcha.generate(captcha_text)
         return io.BytesIO(data.read()), captcha_text
-
 
     async def create_support_invite(interaction: discord.Interaction):
         try:
@@ -614,7 +609,6 @@ class Functions():
             except discord.HTTPException:
                 continue
         return "Could not create invite. There is either no text-channel, or I don't have the rights to create an invite."
-
 
     async def verify(interaction: discord.Interaction):
         class CaptchaInput(discord.ui.Modal, title = 'Verification'):
@@ -685,7 +679,6 @@ class Functions():
         bot.captcha_timeout.append(interaction.user.id)
         await interaction.response.send_message(f'Please verify yourself to gain access to this server.\n\n**Captcha:**', file = captcha_picture, view = SubmitView(), ephemeral = True)
 
-
     async def process_latest_joined():
         while not shutdown:
             for guild in bot.guilds:
@@ -750,7 +743,6 @@ class Functions():
             except asyncio.CancelledError:
                 pass
 
-
     async def check_and_process_temp_bans():
         while not shutdown:
             c.execute('SELECT * FROM temp_bans WHERE unban_time < ?', (time.time(),))
@@ -779,7 +771,7 @@ class Functions():
                     try:
                         await guild.unban(member, reason='Temporary ban expired.')
                         embed = discord.Embed(title = 'Unban', description = f'User {member.mention} was unbanned.', color = discord.Color.green())
-                        embed.timestamp = datetime.utcnow()
+                        embed.timestamp = datetime.datetime.now(datetime.UTC)
                         manlogger.debug(f'Unbanned {member.name}#{member.discriminator} ({member.id}) from {guild.name} ({guild.id}).')
                         c.execute('DELETE FROM temp_bans WHERE guild_id = ? AND user_id = ?', (temp_ban[0], temp_ban[1]))
                         if log_channel is not None:
@@ -798,7 +790,6 @@ class Functions():
                 await asyncio.sleep(15)
             except asyncio.CancelledError:
                 pass
-
 
     async def send_logging_message(interaction: discord.Interaction = None, member: discord.Member = None, kind: str = '', mass_amount: int = 0):
         if interaction is not None:
@@ -824,25 +815,25 @@ class Functions():
 
         if kind == 'verify_start':
             embed = discord.Embed(title = 'Captcha sent', description = f'User {interaction.user.mention} requested a new captcha.', color = discord.Color.blurple())
-            embed.timestamp = datetime.utcnow()
+            embed.timestamp = datetime.datetime.now(datetime.UTC)
             await log_channel.send(embed = embed)
         elif kind == 'verify_success':
             embed = discord.Embed(title = 'Verification successful', description = f'User {interaction.user.mention} successfully verified.', color = discord.Color.green())
-            embed.timestamp = datetime.utcnow()
+            embed.timestamp = datetime.datetime.now(datetime.UTC)
             await log_channel.send(embed = embed)
         elif kind == 'verify_fail':
             embed = discord.Embed(title = 'Wrong captcha', description = f'User {interaction.user.mention} entered a wrong captcha.', color = discord.Color.red())
-            embed.timestamp = datetime.utcnow()
+            embed.timestamp = datetime.datetime.now(datetime.UTC)
             await log_channel.send(embed = embed)
         elif kind == 'verify_kick':
             embed = discord.Embed(title = 'Time limit reached', color = discord.Color.red())
-            embed.timestamp = datetime.utcnow()
+            embed.timestamp = datetime.datetime.now(datetime.UTC)
             embed.add_field(name = 'User', value = member.mention)
             embed.add_field(name = 'Action', value = 'Kick')
             await log_channel.send(embed = embed)
         elif kind == 'verify_ban':
             embed = discord.Embed(title = 'Time limit reached', color = discord.Color.red())
-            embed.timestamp = datetime.utcnow()
+            embed.timestamp = datetime.datetime.now(datetime.UTC)
             embed.add_field(name = 'User', value = member.mention)
             embed.add_field(name = 'Action', value = 'Ban')
             if ban_time is not None:
@@ -850,21 +841,20 @@ class Functions():
             await log_channel.send(embed = embed)
         elif kind == 'verify_mass_started':
             embed = discord.Embed(title = 'Mass verification started', description = f'Mass verification started by {interaction.user.mention}.', color = discord.Color.blurple())
-            embed.timestamp = datetime.utcnow()
+            embed.timestamp = datetime.datetime.now(datetime.UTC)
             await log_channel.send(embed = embed)
         elif kind == 'verify_mass_success':
             embed = discord.Embed(title = 'Mass verification successful', description = f'{interaction.user.mention} successfully applied the verified role to {mass_amount} users.', color = discord.Color.green())
-            embed.timestamp = datetime.utcnow()
+            embed.timestamp = datetime.datetime.now(datetime.UTC)
             await log_channel.send(embed = embed)
         elif kind == 'unban':
             embed = discord.Embed(title = 'Unban', description = f'User {member.mention} was unbanned.', color = discord.Color.green())
-            embed.timestamp = datetime.utcnow()
+            embed.timestamp = datetime.datetime.now(datetime.UTC)
             await log_channel.send(embed = embed)
         elif kind == 'account_too_young':
             embed = discord.Embed(title = 'Account too young', description = f'User {member.mention} was kicked because their account is youger than {Functions.format_seconds(account_age)}.', color = discord.Color.orange())
-            embed.timestamp = datetime.utcnow()
+            embed.timestamp = datetime.datetime.now(datetime.UTC)
             await log_channel.send(embed = embed)
-
 
     def format_seconds(seconds):
         years, remainder = divmod(seconds, 31536000)
@@ -949,7 +939,6 @@ class Owner():
                 os.remove(buffer_folder+'log-lines.txt')
             return
 
-
     async def activity(message, args):
         async def __wrong_selection():
             await message.channel.send('```'
@@ -1006,7 +995,6 @@ class Owner():
         await bot.change_presence(activity = bot.Presence.get_activity(), status = bot.Presence.get_status())
         await message.channel.send(f'Activity set to {action} {title}{" " + url if url else ""}.')
 
-
     async def status(message, args):
         async def __wrong_selection():
             await message.channel.send('```'
@@ -1034,7 +1022,6 @@ class Owner():
             json.dump(data, f, indent=2)
         await bot.change_presence(activity = bot.Presence.get_activity(), status = bot.Presence.get_status())
         await message.channel.send(f'Status set to {action}.')
-
 
     async def shutdown(message):
         global shutdown
@@ -1077,7 +1064,7 @@ async def self(interaction: discord.Interaction):
 
     embed.add_field(name="Created at", value=bot.user.created_at.strftime("%d.%m.%Y, %H:%M:%S"), inline=True)
     embed.add_field(name="Bot-Version", value=bot_version, inline=True)
-    embed.add_field(name="Uptime", value=str(timedelta(seconds=int((datetime.now() - start_time).total_seconds()))), inline=True)
+    embed.add_field(name="Uptime", value=str(datetime.timedelta(seconds=int((datetime.now() - start_time).total_seconds()))), inline=True)
 
     embed.add_field(name="Bot-Owner", value=f"<@!{ownerID}>", inline=True)
     embed.add_field(name="\u200b", value="\u200b", inline=True)
