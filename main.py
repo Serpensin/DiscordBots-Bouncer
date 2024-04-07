@@ -46,7 +46,7 @@ log_folder = f'{app_folder_name}//Logs//'
 buffer_folder = f'{app_folder_name}//Buffer//'
 activity_file = os.path.join(app_folder_name, 'activity.json')
 db_file = os.path.join(app_folder_name, f'{bot_name}.db')
-bot_version = "1.3.1"
+bot_version = "1.3.2"
 
 #Logger init
 logger = logging.getLogger('discord')
@@ -231,7 +231,7 @@ class aclient(discord.AutoShardedClient):
 
     async def on_member_join(self, member: discord.Member):
         def account_age_in_seconds(member: discord.Member) -> int:
-            now = datetime.now(datetime.timezone.utc)
+            now = datetime.datetime.now(datetime.timezone.utc)
             created = member.created_at
             age = now - created
             return age.total_seconds()
@@ -1064,7 +1064,7 @@ async def self(interaction: discord.Interaction):
 
     embed.add_field(name="Created at", value=bot.user.created_at.strftime("%d.%m.%Y, %H:%M:%S"), inline=True)
     embed.add_field(name="Bot-Version", value=bot_version, inline=True)
-    embed.add_field(name="Uptime", value=str(datetime.timedelta(seconds=int((datetime.now() - start_time).total_seconds()))), inline=True)
+    embed.add_field(name="Uptime", value=str(datetime.timedelta(seconds=int((datetime.datetime.now() - start_time).total_seconds()))), inline=True)
 
     embed.add_field(name="Bot-Owner", value=f"<@!{ownerID}>", inline=True)
     embed.add_field(name="\u200b", value="\u200b", inline=True)
