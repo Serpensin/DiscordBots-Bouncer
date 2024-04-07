@@ -46,7 +46,7 @@ log_folder = f'{app_folder_name}//Logs//'
 buffer_folder = f'{app_folder_name}//Buffer//'
 activity_file = os.path.join(app_folder_name, 'activity.json')
 db_file = os.path.join(app_folder_name, f'{bot_name}.db')
-bot_version = "1.3.2"
+bot_version = "1.3.3"
 
 #Logger init
 logger = logging.getLogger('discord')
@@ -1298,6 +1298,7 @@ async def self(interaction: discord.Interaction):
         verify_role_id = data[2]
         if verify_role_id:
             await interaction.response.send_message('Verifying all users on the server. This can take a while.', ephemeral=True)
+            await Functions.captcha_logging(interaction = interaction, kind = 'verify_mass_started')
             verify_role = interaction.guild.get_role(verify_role_id)
             for member in interaction.guild.members:
                 if not member.bot:
@@ -1307,8 +1308,7 @@ async def self(interaction: discord.Interaction):
                             i += 1
                         except discord.Forbidden:
                             continue
-            if i > 0:
-                await Functions.send_logging_message(interaction = interaction, kind = 'verify_mass_success', mass_amount = i)
+            await Functions.captcha_logging(interaction = interaction, kind = 'verify_mass_success', mass_amount = i)
             await interaction.edit_original_response(content = f'{interaction.user.mention}\nVerified {i} users on the server.')
         else:
             await interaction.response.send_message('There are no settings for this server.\nUse `/setup` to set-up this server.', ephemeral=True)
