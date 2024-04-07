@@ -231,7 +231,7 @@ class aclient(discord.AutoShardedClient):
 
     async def on_member_join(self, member: discord.Member):
         def account_age_in_seconds(member: discord.Member) -> int:
-            now = datetime.datetime.now(datetime.timezone.utc)
+            now = datetime.datetime.now(datetime.UTC)
             created = member.created_at
             age = now - created
             return age.total_seconds()
@@ -416,7 +416,7 @@ class aclient(discord.AutoShardedClient):
             manlogger.info('Synced.')
             self.synced = True
             await bot.change_presence(activity = self.Presence.get_activity(), status = self.Presence.get_status())
-        start_time = datetime.datetime.now()
+        start_time = datetime.datetime.now(datetime.UTC)
 
         #Start background tasks
         bot.loop.create_task(Functions.process_latest_joined())
@@ -1064,7 +1064,7 @@ async def self(interaction: discord.Interaction):
 
     embed.add_field(name="Created at", value=bot.user.created_at.strftime("%d.%m.%Y, %H:%M:%S"), inline=True)
     embed.add_field(name="Bot-Version", value=bot_version, inline=True)
-    embed.add_field(name="Uptime", value=str(datetime.timedelta(seconds=int((datetime.datetime.now() - start_time).total_seconds()))), inline=True)
+    embed.add_field(name="Uptime", value=str(datetime.timedelta(seconds=int((datetime.datetime.now(datetime.UTC) - start_time).total_seconds()))), inline=True)
 
     embed.add_field(name="Bot-Owner", value=f"<@!{ownerID}>", inline=True)
     embed.add_field(name="\u200b", value="\u200b", inline=True)
