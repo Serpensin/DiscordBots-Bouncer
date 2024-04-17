@@ -46,7 +46,7 @@ log_folder = f'{app_folder_name}//Logs//'
 buffer_folder = f'{app_folder_name}//Buffer//'
 activity_file = os.path.join(app_folder_name, 'activity.json')
 db_file = os.path.join(app_folder_name, f'{bot_name}.db')
-bot_version = "1.3.3"
+bot_version = "1.3.4"
 
 #Logger init
 logger = logging.getLogger('discord')
@@ -452,6 +452,17 @@ tree = discord.app_commands.CommandTree(bot)
 tree.on_error = bot.on_app_command_error
 
 
+class SignalHandler:
+    def __init__(self):
+        signal.signal(signal.SIGINT, self._shutdown)
+        signal.signal(signal.SIGTERM, self._shutdown)
+
+    def _shutdown(self, signum, frame):
+        manlogger.info('Received signal to shutdown...')
+        pt('Received signal to shutdown...')
+        bot.loop.create_task(Owner.shutdown(owner))
+
+
 # Check if all required variables are set
 support_available = bool(support_id)
 
@@ -557,7 +568,6 @@ class update_stats():
                 await asyncio.sleep(60*30)
             except asyncio.CancelledError:
                 pass
-
 
 
 
@@ -1026,7 +1036,10 @@ class Owner():
     async def shutdown(message):
         global shutdown
         manlogger.info('Engine powering down...')
-        await message.channel.send('Engine powering down...')
+        try:
+            await message.channel.send('Engine powering down...')
+        except:
+            await owner.send('Engine powering down...')
         await bot.change_presence(status=discord.Status.invisible)
         shutdown = True
 
@@ -1340,6 +1353,7 @@ if __name__ == '__main__':
         sys.exit(error_message)
     else:
         try:
+            SignalHandler()
             bot.run(TOKEN, log_handler=None)
         except discord.errors.LoginFailure:
             error_message = 'Invalid token. Please check your .env file.'
