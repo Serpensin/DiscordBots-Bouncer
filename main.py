@@ -13,6 +13,7 @@ import os
 import platform
 import random
 import sentry_sdk
+import signal
 import sqlite3
 import string
 import sys
@@ -459,7 +460,7 @@ class SignalHandler:
 
     def _shutdown(self, signum, frame):
         manlogger.info('Received signal to shutdown...')
-        pt('Received signal to shutdown...')
+        print('Received signal to shutdown...')
         bot.loop.create_task(Owner.shutdown(owner))
 
 
