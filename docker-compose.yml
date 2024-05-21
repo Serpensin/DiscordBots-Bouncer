@@ -11,6 +11,7 @@ services:
       SUPPORT_SERVER: ID_OF_SUPPORTSERVER
       TOKEN: BOT_TOKEN
       OWNER_ID: DISCORD_ID_OF_OWNER
+      LOG_LEVEL: Info
     image: serpensin/bouncer
     volumes:
     - bouncer:/app/Bouncer
