@@ -1,5 +1,6 @@
 ﻿#Import
-print('Loading...')
+import time
+startupTime_start = time.time()
 import aiohttp
 import asyncio
 import datetime
@@ -7,8 +8,6 @@ import discord
 import io
 import json
 import jsonschema
-import logging
-import logging.handlers
 import os
 import platform
 import random
@@ -17,9 +16,9 @@ import signal
 import sqlite3
 import string
 import sys
-import time
 from aiohttp import web
 from captcha.image import ImageCaptcha
+from CustomModules import log_handler
 from dotenv import load_dotenv
 from pytimeparse.timeparse import timeparse
 from urllib.parse import urlparse
@@ -47,27 +46,7 @@ log_folder = f'{app_folder_name}//Logs//'
 buffer_folder = f'{app_folder_name}//Buffer//'
 activity_file = os.path.join(app_folder_name, 'activity.json')
 db_file = os.path.join(app_folder_name, f'{bot_name}.db')
-bot_version = "1.3.4"
-
-#Logger init
-logger = logging.getLogger('discord')
-manlogger = logging.getLogger('Program')
-logger.setLevel(logging.INFO)
-manlogger.setLevel(logging.INFO)
-logging.getLogger('discord.http').setLevel(logging.INFO)
-handler = logging.handlers.RotatingFileHandler(
-    filename = f'{log_folder}{bot_name}.log',
-    encoding = 'utf-8',
-    maxBytes = 8 * 1024 * 1024,
-    backupCount = 5,
-    mode='w')
-dt_fmt = '%Y-%m-%d %H:%M:%S'
-formatter = logging.Formatter('[{asctime}] [{levelname:<8}] {name}: {message}', dt_fmt, style='{')
-handler.setFormatter(formatter)
-logger.addHandler(handler)
-manlogger.addHandler(handler)
-manlogger.info('Engine powering up...')
-
+bot_version = "1.4.0"
 
 #Load env
 TOKEN = os.getenv('TOKEN')
@@ -79,6 +58,13 @@ discordbots_token = os.getenv('DISCORDBOTS_TOKEN')
 discordbotlistcom_token = os.getenv('DISCORDBOTLIST_TOKEN')
 discordbotlisteu_token = os.getenv('DISCORDBOTLISTEU_TOKEN')
 discords_token = os.getenv('DISCORDS_TOKEN')
+LOG_LEVEL = os.getenv('LOG_LEVEL')
+
+#Logger init
+log_manager = log_handler.LogManager(log_folder, app_folder_name, LOG_LEVEL)
+discord_logger = log_manager.get_logger('discord')
+program_logger = log_manager.get_logger('Program')
+program_logger.info('Engine powering up...')
 
 
 #Create activity.json if not exists
@@ -116,10 +102,10 @@ class JSONValidator:
                     data = json.load(file)
                     jsonschema.validate(instance=data, schema=self.schema)  # validate the data
                 except jsonschema.exceptions.ValidationError as ve:
-                    manlogger.debug(f'ValidationError: {ve}')
+                    program_logger.debug(f'ValidationError: {ve}')
                     self.write_default_content()
                 except json.decoder.JSONDecodeError as jde:
-                    manlogger.debug(f'JSONDecodeError: {jde}')
+                    program_logger.debug(f'JSONDecodeError: {jde}')
                     self.write_default_content()
         else:
             self.write_default_content()
@@ -213,21 +199,25 @@ class aclient(discord.AutoShardedClient):
                     except discord.NotFound:
                         pass
                 except Exception as e:
-                    manlogger.warning(f"Unexpected error while sending message: {e}")
+                    discord_logger.warning(f"Unexpected error while sending message: {e}")
             finally:
-                manlogger.warning(f"{error} -> {option_values} | Invoked by {interaction.user.name} ({interaction.user.id})")
+                try:
+                    program_logger.warning(f"{error} -> {option_values} | Invoked by {interaction.user.name} ({interaction.user.id}) @ {interaction.guild.name} ({interaction.guild.id}) with Language {interaction.locale[1]}")
+                except AttributeError:
+                    program_logger.warning(f"{error} -> {option_values} | Invoked by {interaction.user.name} ({interaction.user.id}) with Language {interaction.locale[1]}")
+                sentry_sdk.capture_exception(error)
 
 
     async def on_guild_join(self, guild):
         if not self.initialized:
             return
-        manlogger.info(f'I joined {guild}. (ID: {guild.id})')
+        discord_logger.info(f'I joined {guild}. (ID: {guild.id})')
 
 
     async def on_guild_remove(self, guild):
         if not self.initialized:
             return
-        manlogger.info(f'I got kicked from {guild}. (ID: {guild.id})')
+        discord_logger.info(f'I got kicked from {guild}. (ID: {guild.id})')
 
 
     async def on_member_join(self, member: discord.Member):
@@ -255,7 +245,7 @@ class aclient(discord.AutoShardedClient):
             except discord.Forbidden:
                 return
         else:
-            print(f'Account age is greater than {Functions.format_seconds(account_age_min)}.')
+            program_logger.debug(f'Account age is greater than {Functions.format_seconds(account_age_min)}.')
 
         c.execute('SELECT action FROM servers WHERE guild_id = ?', (member.guild.id,))
         result = c.fetchone()
@@ -365,7 +355,7 @@ class aclient(discord.AutoShardedClient):
 
         if message.guild is None and message.author.id == int(ownerID):
             args = message.content.split(' ')
-            print(args)
+            program_logger.debug(args)
             command, *args = args
             if command == 'help':
                 await __wrong_selection()
@@ -405,16 +395,16 @@ class aclient(discord.AutoShardedClient):
         try:
             owner = await self.fetch_user(ownerID)
             if owner is None:
-                manlogger.critical(f"Invalid ownerID: {ownerID}")
+                program_logger.critical(f"Invalid ownerID: {ownerID}")
                 sys.exit(f"Invalid ownerID: {ownerID}")
         except discord.HTTPException as e:
-            manlogger.critical(f"Error fetching owner user: {e}")
+            program_logger.critical(f"Error fetching owner user: {e}")
             sys.exit(f"Error fetching owner user: {e}")
-        logger.info(f'Logged in as {bot.user} (ID: {bot.user.id})')
+        discord_logger.info(f'Logged in as {bot.user} (ID: {bot.user.id})')
         if not self.synced:
-            manlogger.info('Syncing...')
+            program_logger.info('Syncing...')
             await tree.sync()
-            manlogger.info('Synced.')
+            program_logger.info('Synced.')
             self.synced = True
             await bot.change_presence(activity = self.Presence.get_activity(), status = self.Presence.get_status())
         start_time = datetime.datetime.now(datetime.UTC)
@@ -438,9 +428,9 @@ class aclient(discord.AutoShardedClient):
 
         shutdown = False
         self.initialized = True
-        manlogger.info('All systems online...')
+        program_logger.info('All systems online...')
         clear()
-        print('READY')
+        program_logger.info(f"Initialization completed in {time.time() - startupTime_start} seconds.")
 
 
     async def on_disconnect(self):
@@ -459,8 +449,8 @@ class SignalHandler:
         signal.signal(signal.SIGTERM, self._shutdown)
 
     def _shutdown(self, signum, frame):
-        manlogger.info('Received signal to shutdown...')
-        print('Received signal to shutdown...')
+        program_logger.info('Received signal to shutdown...')
+        program_logger.debug('Received signal to shutdown...')
         bot.loop.create_task(Owner.shutdown(owner))
 
 
@@ -489,7 +479,7 @@ class update_stats():
             async with aiohttp.ClientSession() as session:
                 async with session.post(f'https://top.gg/api/bots/{bot.user.id}/stats', headers=headers, json={'server_count': len(bot.guilds), 'shard_count': len(bot.shards)}) as resp:
                     if resp.status != 200:
-                        manlogger.error(f'Failed to update top.gg: {resp.status} {resp.reason}')
+                        program_logger.error(f'Failed to update top.gg: {resp.status} {resp.reason}')
             try:
                 await asyncio.sleep(60*30)
             except asyncio.CancelledError:
@@ -504,7 +494,7 @@ class update_stats():
             async with aiohttp.ClientSession() as session:
                 async with session.post(f'https://api.discordlist.gg/v0/bots/{bot.user.id}/guilds', headers=headers, json={"count": len(bot.guilds)}) as resp:
                     if resp.status != 200:
-                        manlogger.error(f'Failed to update discordlist.gg: {resp.status} {resp.reason}')
+                        program_logger.error(f'Failed to update discordlist.gg: {resp.status} {resp.reason}')
             try:
                 await asyncio.sleep(60*30)
             except asyncio.CancelledError:
@@ -519,7 +509,7 @@ class update_stats():
             async with aiohttp.ClientSession() as session:
                 async with session.post(f'https://discord.bots.gg/api/v1/bots/{bot.user.id}/stats', headers=headers, json={'guildCount': len(bot.guilds), 'shardCount': len(bot.shards)}) as resp:
                     if resp.status != 200:
-                        manlogger.error(f'Failed to update discord.bots.gg: {resp.status} {resp.reason}')
+                        program_logger.error(f'Failed to update discord.bots.gg: {resp.status} {resp.reason}')
             try:
                 await asyncio.sleep(60*30)
             except asyncio.CancelledError:
@@ -534,7 +524,7 @@ class update_stats():
             async with aiohttp.ClientSession() as session:
                 async with session.post(f'https://discordbotlist.com/api/v1/bots/{bot.user.id}/stats', headers=headers, json={'guilds': len(bot.guilds), 'users': sum(guild.member_count for guild in bot.guilds)}) as resp:
                     if resp.status != 200:
-                        manlogger.error(f'Failed to update discordbotlist.com: {resp.status} {resp.reason}')
+                        program_logger.error(f'Failed to update discordbotlist.com: {resp.status} {resp.reason}')
             try:
                 await asyncio.sleep(60*30)
             except asyncio.CancelledError:
@@ -549,7 +539,7 @@ class update_stats():
             async with aiohttp.ClientSession() as session:
                 async with session.post(f'https://discords.com/bots/api/bot/{bot.user.id}', headers=headers, json={"server_count": len(bot.guilds)}) as resp:
                     if resp.status != 200:
-                        manlogger.error(f'Failed to update discords.com: {resp.status} {resp.reason}')
+                        program_logger.error(f'Failed to update discords.com: {resp.status} {resp.reason}')
             try:
                 await asyncio.sleep(60*30)
             except asyncio.CancelledError:
@@ -564,7 +554,7 @@ class update_stats():
             async with aiohttp.ClientSession() as session:
                 async with session.patch(f'https://api.discord-botlist.eu/v1/update', headers=headers, json={"serverCount": len(bot.guilds)}) as resp:
                     if resp.status != 200:
-                        manlogger.error(f'Failed to update discordlist.gg: {resp.status} {resp.reason}')
+                        program_logger.error(f'Failed to update discordlist.gg: {resp.status} {resp.reason}')
             try:
                 await asyncio.sleep(60*30)
             except asyncio.CancelledError:
@@ -729,9 +719,9 @@ class Functions():
                                 try:
                                     await member.kick(reason='Did not successfully verify in time.')
                                     await Functions.send_logging_message(member = member, kind = 'verify_kick')
-                                    manlogger.debug(f'Kicked {member.name}#{member.discriminator} ({member.id}) from {guild.name} ({guild.id}).')
+                                    program_logger.debug(f'Kicked {member.name}#{member.discriminator} ({member.id}) from {guild.name} ({guild.id}).')
                                 except discord.Forbidden:
-                                    manlogger.debug(f'Could not kick {member.name}#{member.discriminator} ({member.id}) from {guild.name} ({guild.id}).')
+                                    program_logger.debug(f'Could not kick {member.name}#{member.discriminator} ({member.id}) from {guild.name} ({guild.id}).')
                             elif action == 'ban':
                                 try:
                                     if ban_time is not None:
@@ -740,9 +730,9 @@ class Functions():
                                     else:
                                         await member.ban(reason=f'Did not successfully verify in time.')
                                     await Functions.send_logging_message(member = member, kind = 'verify_ban')
-                                    manlogger.debug(f'Banned {member.name}#{member.discriminator} ({member.id}) from {guild.name} ({guild.id}).')
+                                    program_logger.debug(f'Banned {member.name}#{member.discriminator} ({member.id}) from {guild.name} ({guild.id}).')
                                 except discord.Forbidden:
-                                    manlogger.debug(f'Could not ban {member.name}#{member.discriminator} ({member.id}) from {guild.name} ({guild.id}).')
+                                    program_logger.debug(f'Could not ban {member.name}#{member.discriminator} ({member.id}) from {guild.name} ({guild.id}).')
                         else:
                             c.execute('DELETE FROM processing_joined WHERE guild_id = ? AND user_id = ?', (row[0], row[1]))
                 except Exception as e:
@@ -783,15 +773,15 @@ class Functions():
                         await guild.unban(member, reason='Temporary ban expired.')
                         embed = discord.Embed(title = 'Unban', description = f'User {member.mention} was unbanned.', color = discord.Color.green())
                         embed.timestamp = datetime.datetime.now(datetime.UTC)
-                        manlogger.debug(f'Unbanned {member.name}#{member.discriminator} ({member.id}) from {guild.name} ({guild.id}).')
+                        program_logger.debug(f'Unbanned {member.name}#{member.discriminator} ({member.id}) from {guild.name} ({guild.id}).')
                         c.execute('DELETE FROM temp_bans WHERE guild_id = ? AND user_id = ?', (temp_ban[0], temp_ban[1]))
                         if log_channel is not None:
                             try:
                                 await log_channel.send(embed = embed)
                             except discord.Forbidden:
-                                manlogger.debug(f'Could not send unban log message in {guild.name} ({guild.id}).')
+                                program_logger.debug(f'Could not send unban log message in {guild.name} ({guild.id}).')
                     except discord.Forbidden:
-                        manlogger.debug(f'Could not unban {member.name}#{member.discriminator} ({member.id}) from {guild.name} ({guild.id}).')
+                        program_logger.debug(f'Could not unban {member.name}#{member.discriminator} ({member.id}) from {guild.name} ({guild.id}).')
                 except Exception as e:
                     conn.commit()
                     raise e
@@ -974,8 +964,8 @@ class Owner():
         action = args[0].lower()
         url = remove_and_save(args[1:])
         title = ' '.join(args[1:])
-        print(title)
-        print(url)
+        program_logger.debug(title)
+        program_logger.debug(url)
         with open(activity_file, 'r', encoding='utf8') as f:
             data = json.load(f)
         if action == 'playing':
@@ -1036,7 +1026,7 @@ class Owner():
 
     async def shutdown(message):
         global shutdown
-        manlogger.info('Engine powering down...')
+        program_logger.info('Engine powering down...')
         try:
             await message.channel.send('Engine powering down...')
         except:
@@ -1350,7 +1340,7 @@ async def self(interaction: discord.Interaction):
 if __name__ == '__main__':
     if not TOKEN:
         error_message = 'Missing token. Please check your .env file.'
-        manlogger.critical(error_message)
+        program_logger.critical(error_message)
         sys.exit(error_message)
     else:
         try:
@@ -1358,7 +1348,7 @@ if __name__ == '__main__':
             bot.run(TOKEN, log_handler=None)
         except discord.errors.LoginFailure:
             error_message = 'Invalid token. Please check your .env file.'
-            manlogger.critical(error_message)
+            program_logger.critical(error_message)
             sys.exit(error_message)
         except asyncio.CancelledError:
             if shutdown:

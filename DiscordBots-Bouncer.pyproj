@@ -11,7 +11,7 @@
     <OutputPath>.</OutputPath>
     <Name>DiscordBots-Bouncer</Name>
     <RootNamespace>DiscordBots-Bouncer</RootNamespace>
-    <InterpreterId>MSBuild|env|$(MSBuildProjectFullPath)</InterpreterId>
+    <InterpreterId>MSBuild|Bouncer|$(MSBuildProjectFullPath)</InterpreterId>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <DebugSymbols>true</DebugSymbols>
@@ -22,8 +22,10 @@
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="CustomModules\log_handler.py" />
     <Compile Include="Dockerfile" />
     <Compile Include="main.py" />
+    <Compile Include="__init__.py" />
   </ItemGroup>
   <ItemGroup>
     <Content Include=".env" />
@@ -32,10 +34,13 @@
     <Content Include="requirements.txt" />
   </ItemGroup>
   <ItemGroup>
-    <Interpreter Include="env\">
-      <Id>env</Id>
+    <Folder Include="CustomModules\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Interpreter Include="..\..\Venvs\Bouncer\">
+      <Id>Bouncer</Id>
       <Version>0.0</Version>
-      <Description>env (Python 3.12 (64-bit))</Description>
+      <Description>Bouncer (Python 3.12 (64-bit))</Description>
       <InterpreterPath>Scripts\python.exe</InterpreterPath>
       <WindowsInterpreterPath>Scripts\pythonw.exe</WindowsInterpreterPath>
       <PathEnvironmentVariable>PYTHONPATH</PathEnvironmentVariable>
