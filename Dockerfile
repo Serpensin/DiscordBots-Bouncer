@@ -24,7 +24,7 @@ RUN apk update && \
       -exec rm -rf '{}' \; && \
     rm -rf /root/.cache/pip
 
-LABEL maintainer="Discord: the_devil_of_the_rhine (863687441809801246)" \
+LABEL maintainer="Discord: piko.piko.no.mi (970119359840284743)" \
       commit=$COMMIT \
       description="Discord Bot for automatically assigning users a role after they complete a captcha." \
       release=$BUILD_DATE \
