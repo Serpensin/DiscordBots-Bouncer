@@ -10,6 +10,7 @@ import json
 import jsonschema
 import os
 import platform
+import psutil
 import random
 import sentry_sdk
 import signal
@@ -46,11 +47,11 @@ log_folder = f'{app_folder_name}//Logs//'
 buffer_folder = f'{app_folder_name}//Buffer//'
 activity_file = os.path.join(app_folder_name, 'activity.json')
 db_file = os.path.join(app_folder_name, f'{bot_name}.db')
-bot_version = "1.4.0"
+bot_version = "1.4.1"
 
 #Load env
 TOKEN = os.getenv('TOKEN')
-ownerID = os.getenv('OWNER_ID')
+OWNERID = os.getenv('OWNER_ID')
 support_id = os.getenv('SUPPORT_SERVER')
 topgg_token = os.getenv('TOPGG_TOKEN')
 discordlist_token = os.getenv('DISCORDLIST_TOKEN')
@@ -124,7 +125,7 @@ class aclient(discord.AutoShardedClient):
         intents = discord.Intents.default()
         intents.members = True
 
-        super().__init__(owner_id = ownerID,
+        super().__init__(owner_id = OWNERID,
                           intents = intents,
                           status = discord.Status.invisible,
                           auto_reconnect = True
@@ -353,7 +354,7 @@ class aclient(discord.AutoShardedClient):
                                        'shutdown - Shutdown the bot\n'
                                        '```')
 
-        if message.guild is None and message.author.id == int(ownerID):
+        if message.guild is None and message.author.id == int(OWNERID):
             args = message.content.split(' ')
             program_logger.debug(args)
             command, *args = args
@@ -393,10 +394,10 @@ class aclient(discord.AutoShardedClient):
         await self.setup_database(shard_id)
 
         try:
-            owner = await self.fetch_user(ownerID)
+            owner = await self.fetch_user(OWNERID)
             if owner is None:
-                program_logger.critical(f"Invalid ownerID: {ownerID}")
-                sys.exit(f"Invalid ownerID: {ownerID}")
+                program_logger.critical(f"Invalid ownerID: {OWNERID}")
+                sys.exit(f"Invalid ownerID: {OWNERID}")
         except discord.HTTPException as e:
             program_logger.critical(f"Error fetching owner user: {e}")
             sys.exit(f"Error fetching owner user: {e}")
@@ -1058,39 +1059,50 @@ async def self(interaction: discord.Interaction):
 @tree.command(name = 'botinfo', description = 'Get information about the bot.')
 @discord.app_commands.checks.cooldown(1, 60, key=lambda i: (i.user.id))
 async def self(interaction: discord.Interaction):
-    member_count = sum(guild.member_count for guild in bot.guilds)
+        member_count = sum(guild.member_count for guild in bot.guilds)
 
-    embed = discord.Embed(
-        title=f"Informationen about {bot.user.name}",
-        color=discord.Color.blue()
-    )
-    embed.set_thumbnail(url=bot.user.avatar.url if bot.user.avatar else '')
+        embed = discord.Embed(
+            title=f"Informationen about {bot.user.name}",
+            color=discord.Color.blue()
+        )
+        embed.set_thumbnail(url=bot.user.avatar.url if bot.user.avatar else '')
 
-    embed.add_field(name="Created at", value=bot.user.created_at.strftime("%d.%m.%Y, %H:%M:%S"), inline=True)
-    embed.add_field(name="Bot-Version", value=bot_version, inline=True)
-    embed.add_field(name="Uptime", value=str(datetime.timedelta(seconds=int((datetime.datetime.now(datetime.UTC) - start_time).total_seconds()))), inline=True)
+        embed.add_field(name="Created at", value=bot.user.created_at.strftime("%d.%m.%Y, %H:%M:%S"), inline=True)
+        embed.add_field(name="Version", value=bot_version, inline=True)
+        embed.add_field(name="Uptime", value=str(datetime.timedelta(seconds=int((datetime.datetime.now() - start_time).total_seconds()))), inline=True)
 
-    embed.add_field(name="Bot-Owner", value=f"<@!{ownerID}>", inline=True)
-    embed.add_field(name="\u200b", value="\u200b", inline=True)
-    embed.add_field(name="\u200b", value="\u200b", inline=True)
+        embed.add_field(name="Owner", value=f"<@!{OWNERID}>", inline=True)
+        embed.add_field(name="\u200b", value="\u200b", inline=True)
+        embed.add_field(name="\u200b", value="\u200b", inline=True)
 
-    embed.add_field(name="Server", value=f"{len(bot.guilds)}", inline=True)
-    embed.add_field(name="Member count", value=str(member_count), inline=True)
-    embed.add_field(name="\u200b", value="\u200b", inline=True)
+        embed.add_field(name="Server", value=f"{len(bot.guilds)}", inline=True)
+        embed.add_field(name="Member count", value=str(member_count), inline=True)
+        embed.add_field(name="\u200b", value="\u200b", inline=True)
 
-    embed.add_field(name="Shards", value=f"{bot.shard_count}", inline=True)
-    embed.add_field(name="Shard ID", value=f"{interaction.guild.shard_id if interaction.guild else 'N/A'}", inline=True)
-    embed.add_field(name="\u200b", value="\u200b", inline=True)
+        embed.add_field(name="Shards", value=f"{bot.shard_count}", inline=True)
+        embed.add_field(name="Shard ID", value=f"{interaction.guild.shard_id if interaction.guild else 'N/A'}", inline=True)
+        embed.add_field(name="\u200b", value="\u200b", inline=True)
 
-    embed.add_field(name="Python-Version", value=f"{platform.python_version()}", inline=True)
-    embed.add_field(name="discord.py-Version", value=f"{discord.__version__}", inline=True)
-    embed.add_field(name="Sentry-Version", value=f"{sentry_sdk.consts.VERSION}", inline=True)
+        embed.add_field(name="Python", value=f"{platform.python_version()}", inline=True)
+        embed.add_field(name="discord.py", value=f"{discord.__version__}", inline=True)
+        embed.add_field(name="Sentry", value=f"{sentry_sdk.consts.VERSION}", inline=True)
 
-    embed.add_field(name="Repo", value=f"[GitLab](https://gitlab.bloodygang.com/Serpensin/DiscordBots-Bouncer)", inline=True)
-    embed.add_field(name="Invite", value=f"[Invite me](https://discord.com/api/oauth2/authorize?client_id={bot.user.id}&permissions=268519430&scope=bot%20applications.commands)", inline=True)
-    embed.add_field(name="\u200b", value="\u200b", inline=True)
+        embed.add_field(name="Repo", value=f"[GitLab](https://gitlab.bloodygang.com/Serpensin/DBDStats)", inline=True)
+        embed.add_field(name="Invite", value=f"[Invite me](https://discord.com/oauth2/authorize?client_id={bot.user.id}&permissions=67423232&scope=bot)", inline=True)
+        embed.add_field(name="\u200b", value="\u200b", inline=True)
 
-    await interaction.response.send_message(embed=embed)
+        if interaction.user.id == int(OWNERID):
+            # Add CPU and RAM usage
+            process = psutil.Process(os.getpid())
+            cpu_usage = process.cpu_percent()
+            ram_usage = round(process.memory_percent(), 2)
+            ram_real = round(process.memory_info().rss / (1024 ** 2), 2)
+
+            embed.add_field(name="CPU", value=f"{cpu_usage}%", inline=True)
+            embed.add_field(name="RAM", value=f"{ram_usage}%", inline=True)
+            embed.add_field(name="RAM", value=f"{ram_real} MB", inline=True)
+
+        await interaction.response.send_message(embed=embed)
 
 
 
