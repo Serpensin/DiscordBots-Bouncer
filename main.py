@@ -47,7 +47,7 @@ log_folder = f'{app_folder_name}//Logs//'
 buffer_folder = f'{app_folder_name}//Buffer//'
 activity_file = os.path.join(app_folder_name, 'activity.json')
 db_file = os.path.join(app_folder_name, f'{bot_name}.db')
-bot_version = "1.4.1"
+bot_version = "1.4.2"
 
 #Load env
 TOKEN = os.getenv('TOKEN')
@@ -408,7 +408,7 @@ class aclient(discord.AutoShardedClient):
             program_logger.info('Synced.')
             self.synced = True
             await bot.change_presence(activity = self.Presence.get_activity(), status = self.Presence.get_status())
-        start_time = datetime.datetime.now(datetime.UTC)
+        start_time = datetime.datetime.now()
 
         #Start background tasks
         bot.loop.create_task(Functions.process_latest_joined())
