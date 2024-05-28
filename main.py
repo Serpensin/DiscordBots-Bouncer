@@ -41,7 +41,7 @@ LOG_FOLDER = f'{APP_FOLDER_NAME}//Logs//'
 BUFFER_FOLDER = f'{APP_FOLDER_NAME}//Buffer//'
 ACTIVITY_FILE = os.path.join(APP_FOLDER_NAME, 'activity.json')
 DB_FILE = os.path.join(APP_FOLDER_NAME, f'{BOT_NAME}.db')
-BOT_VERSION = "1.4.3"
+BOT_VERSION = "1.4.4"
 
 sentry_sdk.init(
     dsn=os.getenv('SENTRY_DSN'),
@@ -817,48 +817,51 @@ class Functions():
         ban_time = row[6]
         account_age = row[7]
 
-        if kind == 'verify_start':
-            embed = discord.Embed(title = 'Captcha sent', description = f'User {interaction.user.mention} requested a new captcha.', color = discord.Color.blurple())
-            embed.timestamp = datetime.datetime.now(datetime.UTC)
-            await log_channel.send(embed = embed)
-        elif kind == 'verify_success':
-            embed = discord.Embed(title = 'Verification successful', description = f'User {interaction.user.mention} successfully verified.', color = discord.Color.green())
-            embed.timestamp = datetime.datetime.now(datetime.UTC)
-            await log_channel.send(embed = embed)
-        elif kind == 'verify_fail':
-            embed = discord.Embed(title = 'Wrong captcha', description = f'User {interaction.user.mention} entered a wrong captcha.', color = discord.Color.red())
-            embed.timestamp = datetime.datetime.now(datetime.UTC)
-            await log_channel.send(embed = embed)
-        elif kind == 'verify_kick':
-            embed = discord.Embed(title = 'Time limit reached', color = discord.Color.red())
-            embed.timestamp = datetime.datetime.now(datetime.UTC)
-            embed.add_field(name = 'User', value = member.mention)
-            embed.add_field(name = 'Action', value = 'Kick')
-            await log_channel.send(embed = embed)
-        elif kind == 'verify_ban':
-            embed = discord.Embed(title = 'Time limit reached', color = discord.Color.red())
-            embed.timestamp = datetime.datetime.now(datetime.UTC)
-            embed.add_field(name = 'User', value = member.mention)
-            embed.add_field(name = 'Action', value = 'Ban')
-            if ban_time is not None:
-                embed.add_field(name = 'Duration', value = f'{Functions.format_seconds(ban_time)}')
-            await log_channel.send(embed = embed)
-        elif kind == 'verify_mass_started':
-            embed = discord.Embed(title = 'Mass verification started', description = f'Mass verification started by {interaction.user.mention}.', color = discord.Color.blurple())
-            embed.timestamp = datetime.datetime.now(datetime.UTC)
-            await log_channel.send(embed = embed)
-        elif kind == 'verify_mass_success':
-            embed = discord.Embed(title = 'Mass verification successful', description = f'{interaction.user.mention} successfully applied the verified role to {mass_amount} users.', color = discord.Color.green())
-            embed.timestamp = datetime.datetime.now(datetime.UTC)
-            await log_channel.send(embed = embed)
-        elif kind == 'unban':
-            embed = discord.Embed(title = 'Unban', description = f'User {member.mention} was unbanned.', color = discord.Color.green())
-            embed.timestamp = datetime.datetime.now(datetime.UTC)
-            await log_channel.send(embed = embed)
-        elif kind == 'account_too_young':
-            embed = discord.Embed(title = 'Account too young', description = f'User {member.mention} was kicked because their account is youger than {Functions.format_seconds(account_age)}.', color = discord.Color.orange())
-            embed.timestamp = datetime.datetime.now(datetime.UTC)
-            await log_channel.send(embed = embed)
+        try:
+            if kind == 'verify_start':
+                embed = discord.Embed(title = 'Captcha sent', description = f'User {interaction.user.mention} requested a new captcha.', color = discord.Color.blurple())
+                embed.timestamp = datetime.datetime.now(datetime.UTC)
+                await log_channel.send(embed = embed)
+            elif kind == 'verify_success':
+                embed = discord.Embed(title = 'Verification successful', description = f'User {interaction.user.mention} successfully verified.', color = discord.Color.green())
+                embed.timestamp = datetime.datetime.now(datetime.UTC)
+                await log_channel.send(embed = embed)
+            elif kind == 'verify_fail':
+                embed = discord.Embed(title = 'Wrong captcha', description = f'User {interaction.user.mention} entered a wrong captcha.', color = discord.Color.red())
+                embed.timestamp = datetime.datetime.now(datetime.UTC)
+                await log_channel.send(embed = embed)
+            elif kind == 'verify_kick':
+                embed = discord.Embed(title = 'Time limit reached', color = discord.Color.red())
+                embed.timestamp = datetime.datetime.now(datetime.UTC)
+                embed.add_field(name = 'User', value = member.mention)
+                embed.add_field(name = 'Action', value = 'Kick')
+                await log_channel.send(embed = embed)
+            elif kind == 'verify_ban':
+                embed = discord.Embed(title = 'Time limit reached', color = discord.Color.red())
+                embed.timestamp = datetime.datetime.now(datetime.UTC)
+                embed.add_field(name = 'User', value = member.mention)
+                embed.add_field(name = 'Action', value = 'Ban')
+                if ban_time is not None:
+                    embed.add_field(name = 'Duration', value = f'{Functions.format_seconds(ban_time)}')
+                await log_channel.send(embed = embed)
+            elif kind == 'verify_mass_started':
+                embed = discord.Embed(title = 'Mass verification started', description = f'Mass verification started by {interaction.user.mention}.', color = discord.Color.blurple())
+                embed.timestamp = datetime.datetime.now(datetime.UTC)
+                await log_channel.send(embed = embed)
+            elif kind == 'verify_mass_success':
+                embed = discord.Embed(title = 'Mass verification successful', description = f'{interaction.user.mention} successfully applied the verified role to {mass_amount} users.', color = discord.Color.green())
+                embed.timestamp = datetime.datetime.now(datetime.UTC)
+                await log_channel.send(embed = embed)
+            elif kind == 'unban':
+                embed = discord.Embed(title = 'Unban', description = f'User {member.mention} was unbanned.', color = discord.Color.green())
+                embed.timestamp = datetime.datetime.now(datetime.UTC)
+                await log_channel.send(embed = embed)
+            elif kind == 'account_too_young':
+                embed = discord.Embed(title = 'Account too young', description = f'User {member.mention} was kicked because their account is youger than {Functions.format_seconds(account_age)}.', color = discord.Color.orange())
+                embed.timestamp = datetime.datetime.now(datetime.UTC)
+                await log_channel.send(embed = embed)
+        except discord.errors.Forbidden:
+            pass
 
     def format_seconds(seconds):
         years, remainder = divmod(seconds, 31536000)
