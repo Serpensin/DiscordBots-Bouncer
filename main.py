@@ -41,7 +41,7 @@ LOG_FOLDER = f'{APP_FOLDER_NAME}//Logs//'
 BUFFER_FOLDER = f'{APP_FOLDER_NAME}//Buffer//'
 ACTIVITY_FILE = os.path.join(APP_FOLDER_NAME, 'activity.json')
 DB_FILE = os.path.join(APP_FOLDER_NAME, f'{BOT_NAME}.db')
-BOT_VERSION = "1.4.4"
+BOT_VERSION = "1.4.5"
 
 sentry_sdk.init(
     dsn=os.getenv('SENTRY_DSN'),
@@ -1319,7 +1319,7 @@ async def self(interaction: discord.Interaction):
         verify_role_id = data[2]
         if verify_role_id:
             await interaction.response.send_message('Verifying all users on the server. This can take a while.', ephemeral=True)
-            await Functions.captcha_logging(interaction = interaction, kind = 'verify_mass_started')
+            await Functions.send_logging_message(interaction = interaction, kind = 'verify_mass_started')
             verify_role = interaction.guild.get_role(verify_role_id)
             for member in interaction.guild.members:
                 if not member.bot:
@@ -1329,7 +1329,7 @@ async def self(interaction: discord.Interaction):
                             i += 1
                         except discord.Forbidden:
                             continue
-            await Functions.captcha_logging(interaction = interaction, kind = 'verify_mass_success', mass_amount = i)
+            await Functions.send_logging_message(interaction = interaction, kind = 'verify_mass_success', mass_amount = i)
             await interaction.edit_original_response(content = f'{interaction.user.mention}\nVerified {i} users on the server.')
         else:
             await interaction.response.send_message('There are no settings for this server.\nUse `/setup` to set-up this server.', ephemeral=True)
