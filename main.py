@@ -41,7 +41,7 @@ LOG_FOLDER = f'{APP_FOLDER_NAME}//Logs//'
 BUFFER_FOLDER = f'{APP_FOLDER_NAME}//Buffer//'
 ACTIVITY_FILE = os.path.join(APP_FOLDER_NAME, 'activity.json')
 DB_FILE = os.path.join(APP_FOLDER_NAME, f'{BOT_NAME}.db')
-BOT_VERSION = "1.4.5"
+BOT_VERSION = "1.4.6"
 
 sentry_sdk.init(
     dsn=os.getenv('SENTRY_DSN'),
@@ -668,7 +668,11 @@ class Functions():
 
         #Load verify_role from db
         c.execute(f'SELECT verify_role FROM servers WHERE guild_id = {interaction.guild_id}')
-        verified_role_id = c.fetchone()[0]
+        try:
+            verified_role_id = c.fetchone()[0]
+        except TypeError:
+            await interaction.response.send_message('No verified role set. Please contact the server administrator.', ephemeral = True)
+            return
 
         #Test if user allready has the role
         if interaction.guild.get_role(int(verified_role_id)) in interaction.user.roles:
