@@ -41,7 +41,7 @@ LOG_FOLDER = f'{APP_FOLDER_NAME}//Logs//'
 BUFFER_FOLDER = f'{APP_FOLDER_NAME}//Buffer//'
 ACTIVITY_FILE = os.path.join(APP_FOLDER_NAME, 'activity.json')
 DB_FILE = os.path.join(APP_FOLDER_NAME, f'{BOT_NAME}.db')
-BOT_VERSION = "1.4.6"
+BOT_VERSION = "1.4.7"
 
 sentry_sdk.init(
     dsn=os.getenv('SENTRY_DSN'),
@@ -1141,7 +1141,7 @@ if support_available:
 
 #Send pannel
 @tree.command(name = 'send_pannel', description = 'Send pannel to varification channel.')
-@discord.app_commands.checks.cooldown(1, 60, key=lambda i: (i.guild_id))
+# @discord.app_commands.checks.cooldown(1, 60, key=lambda i: (i.guild_id))
 @discord.app_commands.checks.has_permissions(manage_guild = True)
 async def self(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral= True)
@@ -1163,6 +1163,9 @@ async def self(interaction: discord.Interaction):
         ban_time = data[6]
     else:
         verify_channel_id = None
+    if not verify_channel_id:
+        await interaction.followup.send('The verification channel is not set. Please set it with `/setup`.', ephemeral = True)
+        return
     try:
         verify_channel = await bot.fetch_channel(verify_channel_id)
     except discord.NotFound:
@@ -1171,7 +1174,7 @@ async def self(interaction: discord.Interaction):
         await interaction.followup.send(f'I don\'t have permission to see the verification channel (<#{verify_channel_id}>).', ephemeral = True)
         return
     if not verify_channel:
-        await interaction.followup.send('The verification channel is not set or doesn\'t exist. Please set it with `/setup`.', ephemeral = True)
+        await interaction.followup.send('The verification channel doesn\'t exist. Please set it with `/setup`.', ephemeral = True)
         return
 
 
