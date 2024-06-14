@@ -1056,17 +1056,21 @@ class Owner():
         await bot.close()
         
     async def broadcast(message):
+        already_send = []
         success = 0
         forbidden = 0
         error = 0
         for guild in bot.guilds:
             guild_owner = await bot.fetch_user(guild.owner_id)
+            if guild_owner.id in already_send:
+                continue            
             try:
                 await guild_owner.send(f'Broadcast from the owner of the bot:\n{message}')
                 success += 1
+                already_send.append(guild_owner.id)
             except discord.Forbidden:
                 forbidden += 1
-            except:
+            except Exception as e:
                 error += 1
         await owner.send(f'Broadcast finished.\nSuccess: {success}\nForbidden: {forbidden}\nError: {error}')
 
