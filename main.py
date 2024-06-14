@@ -41,7 +41,7 @@ LOG_FOLDER = f'{APP_FOLDER_NAME}//Logs//'
 BUFFER_FOLDER = f'{APP_FOLDER_NAME}//Buffer//'
 ACTIVITY_FILE = os.path.join(APP_FOLDER_NAME, 'activity.json')
 DB_FILE = os.path.join(APP_FOLDER_NAME, f'{BOT_NAME}.db')
-BOT_VERSION = "1.4.8"
+BOT_VERSION = "1.4.9"
 
 sentry_sdk.init(
     dsn=os.getenv('SENTRY_DSN'),
@@ -1060,8 +1060,9 @@ class Owner():
         forbidden = 0
         error = 0
         for guild in bot.guilds:
+            guild_owner = await bot.fetch_user(guild.owner_id)
             try:
-                await guild.owner.send(f'Broadcast from the owner of the bot:\n{message}')
+                await guild_owner.send(f'Broadcast from the owner of the bot:\n{message}')
                 success += 1
             except discord.Forbidden:
                 forbidden += 1
