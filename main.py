@@ -1064,7 +1064,7 @@ class Owner():
                 await guild.owner.send(f'Broadcast from the owner of the bot:\n{message}')
                 success += 1
             except discord.Forbidden:
-                failed += 1
+                forbidden += 1
             except:
                 error += 1
         await owner.send(f'Broadcast finished.\nSuccess: {success}\nForbidden: {forbidden}\nError: {error}')
