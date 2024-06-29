@@ -37,7 +37,7 @@
     <Folder Include="CustomModules\" />
   </ItemGroup>
   <ItemGroup>
-    <Interpreter Include="..\..\Venvs\Bouncer\">
+    <Interpreter Include="H:\venvs\Bouncer\">
       <Id>Bouncer</Id>
       <Version>0.0</Version>
       <Description>Bouncer (Python 3.12 (64-bit))</Description>
