@@ -41,7 +41,7 @@ LOG_FOLDER = f'{APP_FOLDER_NAME}//Logs//'
 BUFFER_FOLDER = f'{APP_FOLDER_NAME}//Buffer//'
 ACTIVITY_FILE = os.path.join(APP_FOLDER_NAME, 'activity.json')
 DB_FILE = os.path.join(APP_FOLDER_NAME, f'{BOT_NAME}.db')
-BOT_VERSION = "1.4.10"
+BOT_VERSION = "1.4.11"
 
 sentry_sdk.init(
     dsn=os.getenv('SENTRY_DSN'),
@@ -1352,6 +1352,9 @@ async def self(interaction: discord.Interaction):
             await interaction.response.send_message('Verifying all users on the server. This can take a while.', ephemeral=True)
             await Functions.send_logging_message(interaction = interaction, kind = 'verify_mass_started')
             verify_role = interaction.guild.get_role(verify_role_id)
+            if verify_role is None:
+                await interaction.response.send_message('The verify role does not exist.', ephemeral=True)
+                return
             for member in interaction.guild.members:
                 if not member.bot:
                     if verify_role not in member.roles:
@@ -1366,6 +1369,11 @@ async def self(interaction: discord.Interaction):
             await interaction.response.send_message('There are no settings for this server.\nUse `/setup` to set-up this server.', ephemeral=True)
     else:
         await interaction.response.send_message('There are no settings for this server.\nUse `/setup` to set-up this server.', ephemeral=True)
+        
+
+
+
+        
 
 
 
