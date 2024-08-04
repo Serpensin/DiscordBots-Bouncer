@@ -41,7 +41,7 @@ LOG_FOLDER = f'{APP_FOLDER_NAME}//Logs//'
 BUFFER_FOLDER = f'{APP_FOLDER_NAME}//Buffer//'
 ACTIVITY_FILE = os.path.join(APP_FOLDER_NAME, 'activity.json')
 DB_FILE = os.path.join(APP_FOLDER_NAME, f'{BOT_NAME}.db')
-BOT_VERSION = "1.4.11"
+BOT_VERSION = "1.5.0"
 
 sentry_sdk.init(
     dsn=os.getenv('SENTRY_DSN'),
@@ -869,8 +869,14 @@ class Functions():
                 embed = discord.Embed(title = 'Account too young', description = f'User {member.mention} was kicked because their account is youger than {Functions.format_seconds(account_age)}.', color = discord.Color.orange())
                 embed.timestamp = datetime.datetime.now(datetime.UTC)
                 await log_channel.send(embed = embed)
+            elif kind == 'user_verify':
+                embed = discord.Embed(title = 'User verified', description = f'User {member.mention} was verified by {interaction.user.mention}.', color = discord.Color.green())
+                embed.timestamp = datetime.datetime.now(datetime.UTC)
+                await log_channel.send(embed = embed)
         except discord.errors.Forbidden:
             pass
+        finally:
+            program_logger.debug(f'Sent logging message in {log_channel.guild.name} ({log_channel.guild.id}) with type {kind}.')
 
     def format_seconds(seconds):
         years, remainder = divmod(seconds, 31536000)
@@ -1370,6 +1376,36 @@ async def self(interaction: discord.Interaction):
     else:
         await interaction.response.send_message('There are no settings for this server.\nUse `/setup` to set-up this server.', ephemeral=True)
         
+
+
+# Verify a single user
+@tree.context_menu(name="Verify User")
+@discord.app_commands.checks.cooldown(1, 60, key=lambda i: (i.guild_id, i.data['target_id']))
+@discord.app_commands.checks.has_permissions(manage_roles=True)
+async def verify_user(interaction: discord.Interaction, member: discord.Member):
+    c.execute('SELECT * FROM servers WHERE guild_id = ?', (interaction.guild.id,))
+    data = c.fetchone()
+    if data:
+        verify_role_id = data[2]
+        if verify_role_id:
+            verify_role = interaction.guild.get_role(verify_role_id)
+            if verify_role is None:
+                await interaction.response.send_message('The verify role does not exist.', ephemeral=True)
+                return
+            if not member.bot and verify_role not in member.roles:
+                try:
+                    await member.add_roles(verify_role, reason=f' {interaction.user.name} verified user via context menu.')
+                    await interaction.response.send_message(f'{member.mention} got verified by {interaction.user.mention}.', ephemeral=True)
+                    await Functions.send_logging_message(interaction=interaction, kind='user_verify', member=member)
+                except discord.Forbidden:
+                    await interaction.response.send_message('I do not have permission to add roles to this user.', ephemeral=True)
+            else:
+                await interaction.response.send_message(f'{member.mention} is already verified or is a bot.', ephemeral=True)
+        else:
+            await interaction.response.send_message('There are no settings for this server.\nUse `/setup` to set-up this server.', ephemeral=True)
+    else:
+        await interaction.response.send_message('There are no settings for this server.\nUse `/setup` to set-up this server.', ephemeral=True)
+
 
 
 
