@@ -1,4 +1,4 @@
-FROM python:3.12.4-alpine
+FROM python:3.12-alpine
 
 WORKDIR /app
 
@@ -27,7 +27,6 @@ RUN apk update && \
     rm -rf /root/.cache/pip
 
 LABEL maintainer="Discord: piko.piko.no.mi (970119359840284743)" \
-      commit=$COMMIT \
       description="Discord Bot for automatically assigning users a role after they complete a captcha." \
       release=$BUILD_DATE \
       version="1.5.1" \
