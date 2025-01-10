@@ -1174,82 +1174,58 @@ if support_available:
 # @discord.app_commands.checks.cooldown(1, 60, key=lambda i: (i.guild_id))
 @discord.app_commands.checks.has_permissions(manage_guild = True)
 async def self(interaction: discord.Interaction):
-    await interaction.response.defer(ephemeral= True)
-    #Captcha Info View
+    await interaction.response.defer(ephemeral=True)
+
     class CaptchaView(discord.ui.View):
         def __init__(self, *, timeout=None):
             super().__init__(timeout=timeout)
-
             self.add_item(discord.ui.Button(label='🤖 Verify', style=discord.ButtonStyle.blurple, custom_id='verify'))
             self.add_item(discord.ui.Button(label='Why?', style=discord.ButtonStyle.blurple, custom_id='why'))
 
-
-    c.execute('SELECT * FROM servers WHERE guild_id = ?', (interaction.guild.id,))
+    c.execute('SELECT verify_channel, timeout, action, ban_time FROM servers WHERE guild_id = ?', (interaction.guild.id,))
     data = c.fetchone()
-    if data:
-        verify_channel_id = data[1]
-        timeout = int(data[4] / 60)
-        action = data[5]
-        ban_time = data[6]
-    else:
-        verify_channel_id = None
-    if not verify_channel_id:
-        await interaction.followup.send('The verification channel is not set. Please set it with `/setup`.', ephemeral = True)
+    if not data:
+        await interaction.followup.send('The verification channel is not set. Please set it with `/setup`.', ephemeral=True)
         return
+
+    verify_channel_id, timeout, action, ban_time = data
+    timeout = int(timeout / 60)
+
     try:
         verify_channel = await bot.fetch_channel(verify_channel_id)
-    except discord.NotFound:
-        verify_channel = None
-    except discord.Forbidden:
-        await interaction.followup.send(f'I don\'t have permission to see the verification channel (<#{verify_channel_id}>).', ephemeral = True)
-        return
-    if not verify_channel:
-        await interaction.followup.send('The verification channel doesn\'t exist. Please set it with `/setup`.', ephemeral = True)
+    except (discord.NotFound, discord.Forbidden):
+        await interaction.followup.send(f'I don\'t have permission to see the verification channel (<#{verify_channel_id}>).', ephemeral=True)
         return
 
-
-    embed = discord.Embed(title = ':robot: Verification required',
-                          color = 0x2b63b0)
+    embed = discord.Embed(title=':robot: Verification required', color=0x2b63b0)
     action_text = {
         'ban': f"you'll be banned{f' for {Functions.format_seconds(ban_time)}' if ban_time else ''}, if you do not verify yourself within {timeout} minutes",
         'kick': f"you'll be kicked, if you do not verify yourself within {timeout} minutes",
         None: "",
     }[action]
-
     embed.description = f"To proceed to `{interaction.guild.name}`, we kindly ask you to confirm your humanity by solving a captcha. Simply click the button below to get started!"
     if action_text:
         embed.description += f"\n\nPlease note that {action_text}."
 
-    c.execute('SELECT * FROM panels WHERE guild_id = ?', (interaction.guild_id,))
-    data = c.fetchone()
-    if data:
-        panel_id = data[1]
+    c.execute('SELECT panel_id FROM panels WHERE guild_id = ?', (interaction.guild_id,))
+    panel_id = c.fetchone()
+    if panel_id:
         try:
-            panel_id = await verify_channel.fetch_message(panel_id)
-        except discord.NotFound:
-            panel_id = None
-        except discord.Forbidden:
-            await interaction.followup.send(f'I don\'t have permission to see the verification channels (<#{verify_channel_id}>) history.\nI need the "Read Message History" permission.', ephemeral = True)
+            await verify_channel.fetch_message(panel_id[0])
+            await interaction.followup.send('The verification panel already exists.\nTo update it, you have to first delete the old one.', ephemeral=True)
             return
-        if not panel_id:
-            try:
-                panel = await verify_channel.send(embed = embed, view = CaptchaView())
-            except discord.Forbidden:
-                await interaction.followup.send(f'I don\'t have permission to send messages in the verification channel (<#{verify_channel_id}>).', ephemeral = True)
-                return
-        else:
-            await interaction.followup.send('The verification panel already exists.\nTo update it, you have to first delete the old one.', ephemeral = True)
-            return
-    else:
-        try:
-            panel = await verify_channel.send(embed = embed, view = CaptchaView())
-        except discord.Forbidden:
-            await interaction.followup.send(f'I don\'t have permission to send messages in the verification channel (<#{verify_channel_id}>).', ephemeral = True)
-            return
+        except (discord.NotFound, discord.Forbidden):
+            pass
+
+    try:
+        panel = await verify_channel.send(embed=embed, view=CaptchaView())
+    except discord.Forbidden:
+        await interaction.followup.send(f'I don\'t have permission to send messages in the verification channel (<#{verify_channel_id}>).', ephemeral=True)
+        return
 
     c.execute('INSERT OR REPLACE INTO panels VALUES (?, ?)', (interaction.guild_id, panel.id))
     conn.commit()
-    await interaction.followup.send(f'The verification panel has been sent to <#{verify_channel_id}>.', ephemeral = True)
+    await interaction.followup.send(f'The verification panel has been sent to <#{verify_channel_id}>.', ephemeral=True)
 
 
 
@@ -1278,43 +1254,49 @@ async def self(interaction: discord.Interaction):
     discord.app_commands.Choice(name = 'Nothing', value = '')
     ])
 async def self(interaction: discord.Interaction, verify_channel: discord.TextChannel, verify_role: discord.Role, log_channel: discord.TextChannel, timeout: int, action: str, ban_time: str = None, account_age: str = None):
-    if action == 'kick':
-        if not interaction.guild.me.guild_permissions.kick_members:
-            await interaction.response.send_message(f'I need the permission to {action} members.', ephemeral=True)
-            return
-    elif action == 'ban':
-        if not interaction.guild.me.guild_permissions.ban_members:
-            await interaction.response.send_message(f'I need the permission to {action} members.', ephemeral=True)
-            return
+    guild_me = interaction.guild.me
+    if action == 'kick' and not guild_me.guild_permissions.kick_members:
+        await interaction.response.send_message(f'I need the permission to {action} members.', ephemeral=True)
+        return
+    elif action == 'ban' and not guild_me.guild_permissions.ban_members:
+        await interaction.response.send_message(f'I need the permission to {action} members.', ephemeral=True)
+        return
+
     if action == '':
         action = None
-    if not verify_channel.permissions_for(interaction.guild.me).send_messages:
+
+    if not verify_channel.permissions_for(guild_me).send_messages:
         await interaction.response.send_message(f'I need the permission to send messages in {verify_channel.mention}.', ephemeral=True)
         return
-    if not interaction.guild.me.top_role > verify_role:
+
+    if guild_me.top_role <= verify_role:
         await interaction.response.send_message(f'My highest role needs to be above {verify_role.mention}, so I can assign it.', ephemeral=True)
         return
-    bot_permissions = log_channel.permissions_for(interaction.guild.me)
+
+    bot_permissions = log_channel.permissions_for(guild_me)
     if not bot_permissions.view_channel:
         await interaction.response.send_message(f'I need the permission to see {log_channel.mention}.', ephemeral=True)
         return
     if not (bot_permissions.send_messages and bot_permissions.embed_links):
         await interaction.response.send_message(f'I need the permission to send messages and embed links in {log_channel.mention}.', ephemeral=True)
         return
-    if ban_time is not None:
+
+    if ban_time:
         ban_time = timeparse(ban_time)
         if ban_time is None:
             await interaction.response.send_message('Invalid ban time. Please use the following format: `1d / 1h / 1m / 1s`.\nFor example: `1d2h3m4s`', ephemeral=True)
             return
-    if account_age is not None:
-        if not interaction.guild.me.guild_permissions.kick_members:
+
+    if account_age:
+        if not guild_me.guild_permissions.kick_members:
             await interaction.response.send_message(f'I need the permission to kick members.', ephemeral=True)
             return
         account_age = timeparse(account_age)
         if account_age is None:
             await interaction.response.send_message('Invalid account age. Please use the following format: `1d / 1h / 1m / 1s`.\nFor example: `1d2h3m4s`', ephemeral=True)
             return
-    c.execute('INSERT OR REPLACE INTO servers VALUES (?, ?, ?, ?, ?, ?, ?, ?)', (interaction.guild.id, verify_channel.id, verify_role.id, log_channel.id, timeout, action, ban_time, account_age,))
+
+    c.execute('INSERT OR REPLACE INTO servers VALUES (?, ?, ?, ?, ?, ?, ?, ?)', (interaction.guild.id, verify_channel.id, verify_role.id, log_channel.id, timeout, action, ban_time, account_age))
     conn.commit()
     await interaction.response.send_message(f'Setup completed.\nYou can now run `/send_panel`, to send the panel to <#{verify_channel.id}>.', ephemeral=True)
 
@@ -1325,20 +1307,24 @@ async def self(interaction: discord.Interaction, verify_channel: discord.TextCha
 @discord.app_commands.checks.cooldown(1, 60, key=lambda i: (i.guild_id))
 @discord.app_commands.checks.has_permissions(manage_guild = True)
 async def self(interaction: discord.Interaction):
-    c.execute('SELECT * FROM servers WHERE guild_id = ?', (interaction.guild.id,))
+    c.execute('SELECT verify_channel, verify_role, log_channel, timeout, action, ban_time, account_age FROM servers WHERE guild_id = ?', (interaction.guild.id,))
     data = c.fetchone()
     if data:
-        verify_channel = data[1]
-        verify_role = data[2]
-        log_channel = data[3]
-        timeout = data[4]
-        action = data[5]
-        ban_time = data[6]
-        account_age = data[7]
-        embed = discord.Embed(title = 'Current settings',
-                              description = f'**Verify Channel:** <#{verify_channel}>\n**Verify Role:** <@&{verify_role}>\n**Log Channel:** <#{log_channel}>\n**Timeout:** {Functions.format_seconds(timeout)}\n**Action:** {action}\n**Banned for:** {(Functions.format_seconds(ban_time) if ban_time is not None else None)}\n**Min account age:** {(Functions.format_seconds(account_age) if account_age is not None else None)}',
-                              color = 0x2b63b0)
-        await interaction.response.send_message(embed = embed, ephemeral=True)
+        verify_channel, verify_role, log_channel, timeout, action, ban_time, account_age = data
+        embed = discord.Embed(
+            title='Current settings',
+            description=(
+                f'**Verify Channel:** <#{verify_channel}>\n'
+                f'**Verify Role:** <@&{verify_role}>\n'
+                f'**Log Channel:** <#{log_channel}>\n'
+                f'**Timeout:** {Functions.format_seconds(timeout)}\n'
+                f'**Action:** {action}\n'
+                f'**Banned for:** {Functions.format_seconds(ban_time) if ban_time else "None"}\n'
+                f'**Min account age:** {Functions.format_seconds(account_age) if account_age else "None"}'
+            ),
+            color=0x2b63b0
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
     else:
         await interaction.response.send_message('There are no settings for this server.\nUse `/setup` to set-up this server.', ephemeral=True)
 
@@ -1349,32 +1335,34 @@ async def self(interaction: discord.Interaction):
 @discord.app_commands.checks.cooldown(1, 3600, key=lambda i: (i.guild_id))
 @discord.app_commands.checks.has_permissions(manage_guild = True)
 async def self(interaction: discord.Interaction):
-    c.execute('SELECT * FROM servers WHERE guild_id = ?', (interaction.guild.id,))
+    c.execute('SELECT verify_role FROM servers WHERE guild_id = ?', (interaction.guild.id,))
     data = c.fetchone()
-    if data:
-        i = 0
-        verify_role_id = data[2]
-        if verify_role_id:
-            await interaction.response.send_message('Verifying all users on the server. This can take a while.', ephemeral=True)
-            await Functions.send_logging_message(interaction = interaction, kind = 'verify_mass_started')
-            verify_role = interaction.guild.get_role(verify_role_id)
-            if verify_role is None:
-                await interaction.response.send_message('The verify role does not exist.', ephemeral=True)
-                return
-            for member in interaction.guild.members:
-                if not member.bot:
-                    if verify_role not in member.roles:
-                        try:
-                            await member.add_roles(verify_role, reason = 'Verify all users on the server.')
-                            i += 1
-                        except discord.Forbidden:
-                            continue
-            await Functions.send_logging_message(interaction = interaction, kind = 'verify_mass_success', mass_amount = i)
-            await interaction.edit_original_response(content = f'{interaction.user.mention}\nVerified {i} users on the server.')
-        else:
-            await interaction.response.send_message('There are no settings for this server.\nUse `/setup` to set-up this server.', ephemeral=True)
-    else:
+    if not data:
         await interaction.response.send_message('There are no settings for this server.\nUse `/setup` to set-up this server.', ephemeral=True)
+        return
+
+    verify_role_id = data[0]
+    if not verify_role_id:
+        await interaction.response.send_message('The verify role does not exist.', ephemeral=True)
+        return
+
+    verify_role = interaction.guild.get_role(verify_role_id)
+    if not verify_role:
+        await interaction.response.send_message('The verify role does not exist.', ephemeral=True)
+        return
+
+    await interaction.response.send_message('Verifying all users on the server. This can take a while.', ephemeral=True)
+    await Functions.send_logging_message(interaction=interaction, kind='verify_mass_started')
+
+    members_to_verify = [member for member in interaction.guild.members if not member.bot and verify_role not in member.roles]
+    for member in members_to_verify:
+        try:
+            await member.add_roles(verify_role, reason='Verify all users on the server.')
+        except discord.Forbidden:
+            continue
+
+    await Functions.send_logging_message(interaction=interaction, kind='verify_mass_success', mass_amount=len(members_to_verify))
+    await interaction.edit_original_response(content=f'{interaction.user.mention}\nVerified {len(members_to_verify)} users on the server.')
         
 
 
@@ -1383,28 +1371,28 @@ async def self(interaction: discord.Interaction):
 @discord.app_commands.checks.cooldown(1, 60, key=lambda i: (i.guild_id, i.data['target_id']))
 @discord.app_commands.checks.has_permissions(manage_roles=True)
 async def verify_user(interaction: discord.Interaction, member: discord.Member):
-    c.execute('SELECT * FROM servers WHERE guild_id = ?', (interaction.guild.id,))
-    data = c.fetchone()
-    if data:
-        verify_role_id = data[2]
-        if verify_role_id:
-            verify_role = interaction.guild.get_role(verify_role_id)
-            if verify_role is None:
-                await interaction.response.send_message('The verify role does not exist.', ephemeral=True)
-                return
-            if not member.bot and verify_role not in member.roles:
-                try:
-                    await member.add_roles(verify_role, reason=f' {interaction.user.name} verified user via context menu.')
-                    await interaction.response.send_message(f'{member.mention} got verified by {interaction.user.mention}.', ephemeral=True)
-                    await Functions.send_logging_message(interaction=interaction, kind='user_verify', member=member)
-                except discord.Forbidden:
-                    await interaction.response.send_message('I do not have permission to add roles to this user.', ephemeral=True)
-            else:
-                await interaction.response.send_message(f'{member.mention} is already verified or is a bot.', ephemeral=True)
-        else:
-            await interaction.response.send_message('There are no settings for this server.\nUse `/setup` to set-up this server.', ephemeral=True)
-    else:
+    c.execute('SELECT verify_role FROM servers WHERE guild_id = ?', (interaction.guild.id,))
+    verify_role_id = c.fetchone()
+    
+    if not verify_role_id:
         await interaction.response.send_message('There are no settings for this server.\nUse `/setup` to set-up this server.', ephemeral=True)
+        return
+
+    verify_role = interaction.guild.get_role(verify_role_id[0])
+    if not verify_role:
+        await interaction.response.send_message('The verify role does not exist.', ephemeral=True)
+        return
+
+    if member.bot or verify_role in member.roles:
+        await interaction.response.send_message(f'{member.mention} is already verified or is a bot.', ephemeral=True)
+        return
+
+    try:
+        await member.add_roles(verify_role, reason=f'{interaction.user.name} verified user via context menu.')
+        await interaction.response.send_message(f'{member.mention} got verified by {interaction.user.mention}.', ephemeral=True)
+        await Functions.send_logging_message(interaction=interaction, kind='user_verify', member=member)
+    except discord.Forbidden:
+        await interaction.response.send_message('I do not have permission to add roles to this user.', ephemeral=True)
 
 
 
