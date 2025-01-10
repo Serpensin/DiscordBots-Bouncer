@@ -41,7 +41,7 @@ LOG_FOLDER = f'{APP_FOLDER_NAME}//Logs//'
 BUFFER_FOLDER = f'{APP_FOLDER_NAME}//Buffer//'
 ACTIVITY_FILE = os.path.join(APP_FOLDER_NAME, 'activity.json')
 DB_FILE = os.path.join(APP_FOLDER_NAME, f'{BOT_NAME}.db')
-BOT_VERSION = "1.5.1"
+BOT_VERSION = "1.5.2"
 
 sentry_sdk.init(
     dsn=os.getenv('SENTRY_DSN'),
@@ -620,35 +620,40 @@ class Functions():
         return "Could not create invite. There is either no text-channel, or I don't have the rights to create an invite."
 
     async def verify(interaction: discord.Interaction):
-        class CaptchaInput(discord.ui.Modal, title = 'Verification'):
+        class CaptchaInput(discord.ui.Modal, title='Verification'):
             def __init__(self):
                 super().__init__()
                 self.verification_successful = False
 
-            answer = discord.ui.TextInput(label = 'Please enter the captcha text:', placeholder = 'Captcha text', min_length = 6, max_length = 6, style = discord.TextStyle.short, required = True)
+            answer = discord.ui.TextInput(
+                label='Please enter the captcha text:',
+                placeholder='Captcha text',
+                min_length=6,
+                max_length=6,
+                style=discord.TextStyle.short,
+                required=True
+            )
 
             async def on_submit(self, interaction: discord.Interaction):
                 if self.answer.value.upper() == captcha_text:
                     try:
                         await interaction.user.add_roles(interaction.guild.get_role(int(verified_role_id)))
-                        await Functions.send_logging_message(interaction = interaction, kind = 'verify_success')
-                        await interaction.response.edit_message(content = 'You have successfully verified yourself.', view = None)
-                        c.execute('DELETE FROM processing_joined WHERE guild_id = ? AND user_id = ?', (interaction.guild.id, interaction.user.id,))
+                        await Functions.send_logging_message(interaction=interaction, kind='verify_success')
+                        await interaction.response.edit_message(content='You have successfully verified yourself.', view=None)
+                        c.execute('DELETE FROM processing_joined WHERE guild_id = ? AND user_id = ?', (interaction.guild.id, interaction.user.id))
                         conn.commit()
                     except discord.Forbidden:
-                        await interaction.response.edit_message(content = 'I do not have the permission to add the verified role.', view = None)
+                        await interaction.response.edit_message(content='I do not have the permission to add the verified role.', view=None)
                     except discord.errors.NotFound:
                         pass
                     if interaction.user.id in bot.captcha_timeout:
                         bot.captcha_timeout.remove(interaction.user.id)
                     self.verification_successful = True
                 else:
-                    await Functions.send_logging_message(interaction = interaction, kind = 'verify_fail')
-                    await interaction.response.edit_message(content = 'The captcha text you entered is incorrect.', view = None)
-
+                    await Functions.send_logging_message(interaction=interaction, kind='verify_fail')
+                    await interaction.response.edit_message(content='The captcha text you entered is incorrect.', view=None)
 
         captcha_input = CaptchaInput()
-
 
         class SubmitButton(discord.ui.Button):
             def __init__(self):
@@ -657,7 +662,6 @@ class Functions():
             async def callback(self, interaction: discord.Interaction):
                 await interaction.response.send_modal(captcha_input)
 
-
         class SubmitView(discord.ui.View):
             def __init__(self, *, timeout=60):
                 super().__init__(timeout=timeout)
@@ -665,214 +669,200 @@ class Functions():
 
             async def on_timeout(self):
                 if not captcha_input.verification_successful:
-                    self.remove_item(SubmitButton())
-                    await interaction.edit_original_response(content = 'Captcha timed out. Request a new one.', view = None)
+                    self.clear_items()
+                    await interaction.edit_original_response(content='Captcha timed out. Request a new one.', view=None)
                     if interaction.user.id in bot.captcha_timeout:
                         bot.captcha_timeout.remove(interaction.user.id)
 
-
-        #Load verify_role from db
-        c.execute(f'SELECT verify_role FROM servers WHERE guild_id = {interaction.guild_id}')
-        try:
-            verified_role_id = c.fetchone()[0]
-        except TypeError:
-            await interaction.response.send_message('No verified role set. Please contact the server administrator.', ephemeral = True)
+        # Load verify_role from db
+        c.execute('SELECT verify_role FROM servers WHERE guild_id = ?', (interaction.guild_id,))
+        verified_role_id = c.fetchone()
+        if not verified_role_id:
+            await interaction.response.send_message('No verified role set. Please contact the server administrator.', ephemeral=True)
             return
+        verified_role_id = verified_role_id[0]
 
-        #Test if user allready has the role
+        # Test if user already has the role
         if interaction.guild.get_role(int(verified_role_id)) in interaction.user.roles:
-            await interaction.response.send_message('You are already verified.', ephemeral = True)
+            await interaction.response.send_message('You are already verified.', ephemeral=True)
             return
 
-        await Functions.send_logging_message(interaction = interaction, kind = 'verify_start')
-        captcha = Functions.create_captcha()
-        captcha_picture = discord.File(captcha[0], filename = 'captcha.png')
-        captcha_text = captcha[1]
+        await Functions.send_logging_message(interaction=interaction, kind='verify_start')
+        captcha_picture, captcha_text = Functions.create_captcha()
 
         bot.captcha_timeout.append(interaction.user.id)
-        await interaction.response.send_message(f'Please verify yourself to gain access to this server.\n\n**Captcha:**', file = captcha_picture, view = SubmitView(), ephemeral = True)
+        await interaction.response.send_message(
+            'Please verify yourself to gain access to this server.\n\n**Captcha:**',
+            file=discord.File(captcha_picture, filename='captcha.png'),
+            view=SubmitView(),
+            ephemeral=True
+        )
 
     async def process_latest_joined():
         while not shutdown:
+            current_time = int(time.time())
             for guild in bot.guilds:
                 try:
-                    c.execute('SELECT * FROM servers WHERE guild_id = ?', (guild.id,))
+                    c.execute('SELECT timeout, verify_role, action, ban_time FROM servers WHERE guild_id = ?', (guild.id,))
                     server = c.fetchone()
-                    if server is None:
+                    if not server:
                         continue
-                    timeout = server[4]
-                    verified_role_id = server[2]
-                    action = server[5]
-                    ban_time = server[6]
-                    c.execute('SELECT * FROM processing_joined WHERE guild_id = ? AND (join_time + ?) < ?', (guild.id, timeout, int(time.time())))
+                    timeout, verified_role_id, action, ban_time = server
+                    c.execute('SELECT user_id FROM processing_joined WHERE guild_id = ? AND (join_time + ?) < ?', (guild.id, timeout, current_time))
                     rows = c.fetchall()
-                    for row in rows:
-                        guild = bot.get_guild(row[0])
-                        if guild is None:
-                            c.execute('DELETE FROM processing_joined WHERE guild_id = ?', (row[0],))
-                            continue
-                        member = guild.get_member(row[1])
-                        if member is None:
+                    if not rows:
+                        continue
+                    verified_role = guild.get_role(verified_role_id)
+                    if not verified_role:
+                        continue
+                    for user_id, in rows:
+                        member = guild.get_member(user_id)
+                        if not member:
                             try:
-                                member = await guild.fetch_member(row[1])
-                                if member is None:
-                                    c.execute('DELETE FROM processing_joined WHERE guild_id = ? AND user_id = ?', (row[0], row[1]))
-                                    continue
+                                member = await guild.fetch_member(user_id)
                             except discord.NotFound:
-                                c.execute('DELETE FROM processing_joined WHERE guild_id = ? AND user_id = ?', (row[0], row[1]))
-                                continue
-                        if action is None:
+                                pass
+                        if not member or verified_role in member.roles:
+                            c.execute('DELETE FROM processing_joined WHERE guild_id = ? AND user_id = ?', (guild.id, user_id))
                             continue
-                        verified_role = guild.get_role(verified_role_id)
-                        if verified_role is None:
-                            continue
-                        if verified_role not in member.roles:
-                            if action == 'kick':
-                                try:
-                                    await member.kick(reason='Did not successfully verify in time.')
-                                    await Functions.send_logging_message(member = member, kind = 'verify_kick')
-                                    program_logger.debug(f'Kicked {member.name}#{member.discriminator} ({member.id}) from {guild.name} ({guild.id}).')
-                                except discord.Forbidden:
-                                    program_logger.debug(f'Could not kick {member.name}#{member.discriminator} ({member.id}) from {guild.name} ({guild.id}).')
-                            elif action == 'ban':
-                                try:
-                                    if ban_time is not None:
-                                        await member.ban(reason=f'Did not successfully verify in time. Banned for {Functions.format_seconds(ban_time)}')
-                                        c.execute('INSERT INTO temp_bans VALUES (?, ?, ?)', (guild.id, member.id, int(time.time() + ban_time)))
-                                    else:
-                                        await member.ban(reason=f'Did not successfully verify in time.')
-                                    await Functions.send_logging_message(member = member, kind = 'verify_ban')
-                                    program_logger.debug(f'Banned {member.name}#{member.discriminator} ({member.id}) from {guild.name} ({guild.id}).')
-                                except discord.Forbidden:
-                                    program_logger.debug(f'Could not ban {member.name}#{member.discriminator} ({member.id}) from {guild.name} ({guild.id}).')
-                        else:
-                            c.execute('DELETE FROM processing_joined WHERE guild_id = ? AND user_id = ?', (row[0], row[1]))
+                        if action == 'kick':
+                            try:
+                                await member.kick(reason='Did not successfully verify in time.')
+                                await Functions.send_logging_message(member=member, kind='verify_kick')
+                                program_logger.debug(f'Kicked {member} from {guild}.')
+                            except discord.Forbidden:
+                                program_logger.debug(f'Could not kick {member} from {guild}.')
+                        elif action == 'ban':
+                            try:
+                                await member.ban(reason=f'Did not successfully verify in time. Banned for {Functions.format_seconds(ban_time)}' if ban_time else 'Did not successfully verify in time.')
+                                if ban_time:
+                                    c.execute('INSERT INTO temp_bans VALUES (?, ?, ?)', (guild.id, member.id, current_time + ban_time))
+                                await Functions.send_logging_message(member=member, kind='verify_ban')
+                                program_logger.debug(f'Banned {member} from {guild}.')
+                            except discord.Forbidden:
+                                program_logger.debug(f'Could not ban {member} from {guild}.')
+                        c.execute('DELETE FROM processing_joined WHERE guild_id = ? AND user_id = ?', (guild.id, user_id))
                 except Exception as e:
-                    conn.commit()
-                    raise e
+                    program_logger.error(f'Error processing guild {guild.id}: {e}')
             conn.commit()
             try:
                 await asyncio.sleep(15)
             except asyncio.CancelledError:
-                pass
+                break
 
     async def check_and_process_temp_bans():
         while not shutdown:
-            c.execute('SELECT * FROM temp_bans WHERE unban_time < ?', (time.time(),))
+            current_time = time.time()
+            c.execute('SELECT * FROM temp_bans WHERE unban_time < ?', (current_time,))
             temp_bans = c.fetchall()
             for temp_ban in temp_bans:
+                guild_id, user_id, _ = temp_ban
                 try:
-                    guild = bot.get_guild(temp_ban[0])
+                    guild = bot.get_guild(guild_id)
                     if guild is None:
-                        c.execute('DELETE FROM temp_bans WHERE guild_id = ?', (temp_ban[0],))
+                        c.execute('DELETE FROM temp_bans WHERE guild_id = ?', (guild_id,))
                         continue
-                    member = bot.get_user(temp_ban[1])
+                    member = bot.get_user(user_id)
                     if member is None:
                         try:
-                            member = await bot.fetch_user(temp_ban[1])
+                            member = await bot.fetch_user(user_id)
                         except discord.NotFound:
-                            c.execute('DELETE FROM temp_bans WHERE guild_id = ? AND user_id = ?', (temp_ban[0], temp_ban[1]))
+                            c.execute('DELETE FROM temp_bans WHERE guild_id = ? AND user_id = ?', (guild_id, user_id))
                             continue
-                    c.execute('SELECT log_channel FROM servers WHERE guild_id = ?', (guild.id,))
+                    c.execute('SELECT log_channel FROM servers WHERE guild_id = ?', (guild_id,))
                     log_channel_id = c.fetchone()[0]
-                    log_channel = guild.get_channel(int(log_channel_id))
+                    log_channel = guild.get_channel(log_channel_id)
                     if log_channel is None:
                         try:
-                            log_channel = await guild.fetch_channel(int(log_channel_id))
-                        except:
+                            log_channel = await guild.fetch_channel(log_channel_id)
+                        except discord.HTTPException:
                             log_channel = None
                     try:
                         await guild.unban(member, reason='Temporary ban expired.')
-                        embed = discord.Embed(title = 'Unban', description = f'User {member.mention} was unbanned.', color = discord.Color.green())
+                        embed = discord.Embed(title='Unban', description=f'User {member.mention} was unbanned.', color=discord.Color.green())
                         embed.timestamp = datetime.datetime.now(datetime.UTC)
                         program_logger.debug(f'Unbanned {member.name}#{member.discriminator} ({member.id}) from {guild.name} ({guild.id}).')
-                        c.execute('DELETE FROM temp_bans WHERE guild_id = ? AND user_id = ?', (temp_ban[0], temp_ban[1]))
-                        if log_channel is not None:
+                        c.execute('DELETE FROM temp_bans WHERE guild_id = ? AND user_id = ?', (guild_id, user_id))
+                        if log_channel:
                             try:
-                                await log_channel.send(embed = embed)
+                                await log_channel.send(embed=embed)
                             except discord.Forbidden:
                                 program_logger.debug(f'Could not send unban log message in {guild.name} ({guild.id}).')
                     except discord.Forbidden:
                         program_logger.debug(f'Could not unban {member.name}#{member.discriminator} ({member.id}) from {guild.name} ({guild.id}).')
                 except Exception as e:
                     conn.commit()
-                    raise e
+                    program_logger.error(f'Error processing temp ban: {e}')
+                    continue
 
             conn.commit()
             try:
                 await asyncio.sleep(15)
             except asyncio.CancelledError:
-                pass
+                break
 
     async def send_logging_message(interaction: discord.Interaction = None, member: discord.Member = None, kind: str = '', mass_amount: int = 0):
-        if interaction is not None:
-            c.execute('SELECT * FROM servers WHERE guild_id = ?', (interaction.guild_id,))
-            row = c.fetchone()
-            log_channel_id = row[3]
-            if log_channel_id is None:
-                return
-            log_channel = interaction.guild.get_channel(int(log_channel_id))
-            if log_channel is None:
-                return
-        elif member is not None:
-            c.execute('SELECT * FROM servers WHERE guild_id = ?', (member.guild.id,))
-            row = c.fetchone()
-            log_channel_id = row[3]
-            if log_channel_id is None:
-                return
-            log_channel = member.guild.get_channel(int(log_channel_id))
-            if log_channel is None:
-                return
-        ban_time = row[6]
-        account_age = row[7]
+        guild_id = interaction.guild_id if interaction else member.guild.id
+        c.execute('SELECT log_channel, ban_time, account_age FROM servers WHERE guild_id = ?', (guild_id,))
+        row = c.fetchone()
+        if not row:
+            return
+        log_channel_id, ban_time, account_age = row
+        if not log_channel_id:
+            return
+
+        log_channel = (interaction.guild if interaction else member.guild).get_channel(log_channel_id)
+        if not log_channel:
+            return
+
+        embed = discord.Embed(timestamp=datetime.datetime.now(datetime.UTC))
+        if kind == 'verify_start':
+            embed.title = 'Captcha sent'
+            embed.description = f'User {interaction.user.mention} requested a new captcha.'
+            embed.color = discord.Color.blurple()
+        elif kind == 'verify_success':
+            embed.title = 'Verification successful'
+            embed.description = f'User {interaction.user.mention} successfully verified.'
+            embed.color = discord.Color.green()
+        elif kind == 'verify_fail':
+            embed.title = 'Wrong captcha'
+            embed.description = f'User {interaction.user.mention} entered a wrong captcha.'
+            embed.color = discord.Color.red()
+        elif kind == 'verify_kick':
+            embed.title = 'Time limit reached'
+            embed.color = discord.Color.red()
+            embed.add_field(name='User', value=member.mention)
+            embed.add_field(name='Action', value='Kick')
+        elif kind == 'verify_ban':
+            embed.title = 'Time limit reached'
+            embed.color = discord.Color.red()
+            embed.add_field(name='User', value=member.mention)
+            embed.add_field(name='Action', value='Ban')
+            if ban_time:
+                embed.add_field(name='Duration', value=f'{Functions.format_seconds(ban_time)}')
+        elif kind == 'verify_mass_started':
+            embed.title = 'Mass verification started'
+            embed.description = f'Mass verification started by {interaction.user.mention}.'
+            embed.color = discord.Color.blurple()
+        elif kind == 'verify_mass_success':
+            embed.title = 'Mass verification successful'
+            embed.description = f'{interaction.user.mention} successfully applied the verified role to {mass_amount} users.'
+            embed.color = discord.Color.green()
+        elif kind == 'unban':
+            embed.title = 'Unban'
+            embed.description = f'User {member.mention} was unbanned.'
+            embed.color = discord.Color.green()
+        elif kind == 'account_too_young':
+            embed.title = 'Account too young'
+            embed.description = f'User {member.mention} was kicked because their account is younger than {Functions.format_seconds(account_age)}.'
+            embed.color = discord.Color.orange()
+        elif kind == 'user_verify':
+            embed.title = 'User verified'
+            embed.description = f'User {member.mention} was verified by {interaction.user.mention}.'
+            embed.color = discord.Color.green()
 
         try:
-            if kind == 'verify_start':
-                embed = discord.Embed(title = 'Captcha sent', description = f'User {interaction.user.mention} requested a new captcha.', color = discord.Color.blurple())
-                embed.timestamp = datetime.datetime.now(datetime.UTC)
-                await log_channel.send(embed = embed)
-            elif kind == 'verify_success':
-                embed = discord.Embed(title = 'Verification successful', description = f'User {interaction.user.mention} successfully verified.', color = discord.Color.green())
-                embed.timestamp = datetime.datetime.now(datetime.UTC)
-                await log_channel.send(embed = embed)
-            elif kind == 'verify_fail':
-                embed = discord.Embed(title = 'Wrong captcha', description = f'User {interaction.user.mention} entered a wrong captcha.', color = discord.Color.red())
-                embed.timestamp = datetime.datetime.now(datetime.UTC)
-                await log_channel.send(embed = embed)
-            elif kind == 'verify_kick':
-                embed = discord.Embed(title = 'Time limit reached', color = discord.Color.red())
-                embed.timestamp = datetime.datetime.now(datetime.UTC)
-                embed.add_field(name = 'User', value = member.mention)
-                embed.add_field(name = 'Action', value = 'Kick')
-                await log_channel.send(embed = embed)
-            elif kind == 'verify_ban':
-                embed = discord.Embed(title = 'Time limit reached', color = discord.Color.red())
-                embed.timestamp = datetime.datetime.now(datetime.UTC)
-                embed.add_field(name = 'User', value = member.mention)
-                embed.add_field(name = 'Action', value = 'Ban')
-                if ban_time is not None:
-                    embed.add_field(name = 'Duration', value = f'{Functions.format_seconds(ban_time)}')
-                await log_channel.send(embed = embed)
-            elif kind == 'verify_mass_started':
-                embed = discord.Embed(title = 'Mass verification started', description = f'Mass verification started by {interaction.user.mention}.', color = discord.Color.blurple())
-                embed.timestamp = datetime.datetime.now(datetime.UTC)
-                await log_channel.send(embed = embed)
-            elif kind == 'verify_mass_success':
-                embed = discord.Embed(title = 'Mass verification successful', description = f'{interaction.user.mention} successfully applied the verified role to {mass_amount} users.', color = discord.Color.green())
-                embed.timestamp = datetime.datetime.now(datetime.UTC)
-                await log_channel.send(embed = embed)
-            elif kind == 'unban':
-                embed = discord.Embed(title = 'Unban', description = f'User {member.mention} was unbanned.', color = discord.Color.green())
-                embed.timestamp = datetime.datetime.now(datetime.UTC)
-                await log_channel.send(embed = embed)
-            elif kind == 'account_too_young':
-                embed = discord.Embed(title = 'Account too young', description = f'User {member.mention} was kicked because their account is youger than {Functions.format_seconds(account_age)}.', color = discord.Color.orange())
-                embed.timestamp = datetime.datetime.now(datetime.UTC)
-                await log_channel.send(embed = embed)
-            elif kind == 'user_verify':
-                embed = discord.Embed(title = 'User verified', description = f'User {member.mention} was verified by {interaction.user.mention}.', color = discord.Color.green())
-                embed.timestamp = datetime.datetime.now(datetime.UTC)
-                await log_channel.send(embed = embed)
+            await log_channel.send(embed=embed)
         except discord.errors.Forbidden:
             pass
         finally:
