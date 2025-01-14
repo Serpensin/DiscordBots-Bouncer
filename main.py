@@ -41,7 +41,7 @@ LOG_FOLDER = f'{APP_FOLDER_NAME}//Logs//'
 BUFFER_FOLDER = f'{APP_FOLDER_NAME}//Buffer//'
 ACTIVITY_FILE = os.path.join(APP_FOLDER_NAME, 'activity.json')
 DB_FILE = os.path.join(APP_FOLDER_NAME, f'{BOT_NAME}.db')
-BOT_VERSION = "1.5.2"
+BOT_VERSION = "1.5.3"
 
 sentry_sdk.init(
     dsn=os.getenv('SENTRY_DSN'),
@@ -210,18 +210,15 @@ class aclient(discord.AutoShardedClient):
                     program_logger.warning(f"{error} -> {option_values} | Invoked by {interaction.user.name} ({interaction.user.id}) with Language {interaction.locale[1]}")
                 sentry_sdk.capture_exception(error)
 
-
     async def on_guild_join(self, guild):
         if not self.initialized:
             return
         discord_logger.info(f'I joined {guild}. (ID: {guild.id})')
 
-
     async def on_guild_remove(self, guild):
         if not self.initialized:
             return
         discord_logger.info(f'I got kicked from {guild}. (ID: {guild.id})')
-
 
     async def on_member_join(self, member: discord.Member):
         def account_age_in_seconds(member: discord.Member) -> int:
@@ -803,7 +800,7 @@ class Functions():
 
     async def send_logging_message(interaction: discord.Interaction = None, member: discord.Member = None, kind: str = '', mass_amount: int = 0):
         guild_id = interaction.guild_id if interaction else member.guild.id
-        c.execute('SELECT log_channel, ban_time, account_age FROM servers WHERE guild_id = ?', (guild_id,))
+        c.execute('SELECT log_channel, ban_time, account_age_min FROM servers WHERE guild_id = ?', (guild_id,))
         row = c.fetchone()
         if not row:
             return
@@ -1297,7 +1294,7 @@ async def self(interaction: discord.Interaction, verify_channel: discord.TextCha
 @discord.app_commands.checks.cooldown(1, 60, key=lambda i: (i.guild_id))
 @discord.app_commands.checks.has_permissions(manage_guild = True)
 async def self(interaction: discord.Interaction):
-    c.execute('SELECT verify_channel, verify_role, log_channel, timeout, action, ban_time, account_age FROM servers WHERE guild_id = ?', (interaction.guild.id,))
+    c.execute('SELECT verify_channel, verify_role, log_channel, timeout, action, ban_time, account_age_min FROM servers WHERE guild_id = ?', (interaction.guild.id,))
     data = c.fetchone()
     if data:
         verify_channel, verify_role, log_channel, timeout, action, ban_time, account_age = data
