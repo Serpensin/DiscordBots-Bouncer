@@ -1034,11 +1034,12 @@ class Owner():
 
     async def shutdown(message):
         global shutdown
-        program_logger.info('Engine powering down...')
+        _message = 'Engine powering down...'
+        program_logger.info(_message)
         try:
-            await message.channel.send('Engine powering down...')
+            await message.channel.send(_message)
         except:
-            await owner.send('Engine powering down...')
+            await owner.send(_message)
         await bot.change_presence(status=discord.Status.invisible)
         shutdown = True
 
