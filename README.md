@@ -75,5 +75,5 @@ docker run -d \
 --health-start-period=40s \
 -p 5000:5000 \
 -v bouncer:/app/Bouncer \
-serpensin/bouncer
+ghcr.io/serpensin/discordbots-bouncer
 ```

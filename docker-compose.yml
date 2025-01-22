@@ -12,7 +12,7 @@ services:
       TOKEN: BOT_TOKEN
       OWNER_ID: DISCORD_ID_OF_OWNER
       LOG_LEVEL: Info
-    image: serpensin/bouncer
+    image: ghcr.io/serpensin/discordbots-bouncer:latest
     volumes:
     - bouncer:/app/Bouncer
     healthcheck:

@@ -17,8 +17,8 @@ ARG COMMIT
 RUN apk update && \
     apk add --no-cache --virtual .build-deps gcc musl-dev python3-dev linux-headers jpeg-dev zlib-dev libjpeg rust cargo && \
     apk add --no-cache curl && \
-    python -m pip install --upgrade pip setuptools && \
-    pip install -r requirements.txt && \
+    python -m pip install --root-user-action ignore --upgrade pip setuptools && \
+    pip install --root-user-action ignore -r requirements.txt && \
     apk del .build-deps && \
     find /usr/local \
       \( -type d -a \( -name test -o -name tests \) \) \
