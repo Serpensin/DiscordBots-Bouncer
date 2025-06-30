@@ -41,7 +41,7 @@ LOG_FOLDER = f'{APP_FOLDER_NAME}//Logs//'
 BUFFER_FOLDER = f'{APP_FOLDER_NAME}//Buffer//'
 ACTIVITY_FILE = os.path.join(APP_FOLDER_NAME, 'activity.json')
 DB_FILE = os.path.join(APP_FOLDER_NAME, f'{BOT_NAME}.db')
-BOT_VERSION = "1.5.3"
+BOT_VERSION = "1.5.4"
 
 sentry_sdk.init(
     dsn=os.getenv('SENTRY_DSN'),
@@ -1114,8 +1114,8 @@ async def self(interaction: discord.Interaction):
         embed.add_field(name="discord.py", value=f"{discord.__version__}", inline=True)
         embed.add_field(name="Sentry", value=f"{sentry_sdk.consts.VERSION}", inline=True)
 
-        embed.add_field(name="Repo", value=f"[GitLab](https://gitlab.bloodygang.com/Serpensin/DiscordBots-Bouncer)", inline=True)
-        embed.add_field(name="Invite", value=f"[Invite me](https://discord.com/oauth2/authorize?client_id={bot.user.id}&permissions=67423232&scope=bot)", inline=True)
+        embed.add_field(name="Repo", value=f"[GitHub](https://github.com/Serpensin/DiscordBots-Bouncer)", inline=True)
+        embed.add_field(name="Invite", value=f"[Invite me](https://discord.com/oauth2/authorize?client_id={bot.user.id})", inline=True)
         embed.add_field(name="\u200b", value="\u200b", inline=True)
 
         if interaction.user.id == int(OWNERID):
