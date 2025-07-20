@@ -41,7 +41,7 @@ LOG_FOLDER = f'{APP_FOLDER_NAME}//Logs//'
 BUFFER_FOLDER = f'{APP_FOLDER_NAME}//Buffer//'
 ACTIVITY_FILE = os.path.join(APP_FOLDER_NAME, 'activity.json')
 DB_FILE = os.path.join(APP_FOLDER_NAME, f'{BOT_NAME}.db')
-BOT_VERSION = "1.5.5"
+BOT_VERSION = "1.5.6"
 
 sentry_sdk.init(
     dsn=os.getenv('SENTRY_DSN'),
@@ -1091,7 +1091,7 @@ async def self(interaction: discord.Interaction):
         member_count = sum(guild.member_count for guild in bot.guilds)
 
         embed = discord.Embed(
-            title=f"Informationen about {bot.user.name}",
+            title=f"Information about {bot.user.name}",
             color=discord.Color.blue()
         )
         embed.set_thumbnail(url=bot.user.avatar.url if bot.user.avatar else '')
