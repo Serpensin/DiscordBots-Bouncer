@@ -41,7 +41,7 @@ LOG_FOLDER = f'{APP_FOLDER_NAME}//Logs//'
 BUFFER_FOLDER = f'{APP_FOLDER_NAME}//Buffer//'
 ACTIVITY_FILE = os.path.join(APP_FOLDER_NAME, 'activity.json')
 DB_FILE = os.path.join(APP_FOLDER_NAME, f'{BOT_NAME}.db')
-BOT_VERSION = "1.5.6"
+BOT_VERSION = "1.5.7"
 
 sentry_sdk.init(
     dsn=os.getenv('SENTRY_DSN'),
@@ -208,7 +208,6 @@ class aclient(discord.AutoShardedClient):
                     program_logger.warning(f"{error} -> {option_values} | Invoked by {interaction.user.name} ({interaction.user.id}) @ {interaction.guild.name} ({interaction.guild.id}) with Language {interaction.locale[1]}")
                 except AttributeError:
                     program_logger.warning(f"{error} -> {option_values} | Invoked by {interaction.user.name} ({interaction.user.id}) with Language {interaction.locale[1]}")
-                sentry_sdk.capture_exception(error)
 
     async def on_guild_join(self, guild):
         if not self.initialized:
