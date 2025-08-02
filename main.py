@@ -254,13 +254,11 @@ class aclient(discord.AutoShardedClient):
         c.execute('INSERT INTO processing_joined VALUES (?, ?, ?)', (member.guild.id, member.id, int(time.time(),)))
         conn.commit()
 
-
     async def on_member_remove(self, member: discord.Member):
         if not self.initialized:
             return
         c.execute('DELETE FROM processing_joined WHERE guild_id = ? AND user_id = ?', (member.guild.id, member.id,))
         conn.commit()
-
 
     async def on_interaction(self, interaction: discord.Interaction):
         if not self.initialized:
@@ -434,7 +432,6 @@ class aclient(discord.AutoShardedClient):
         shutdown = False
         self.initialized = True
         program_logger.info('All systems online...')
-        clear()
         program_logger.info(f"Initialization completed in {time.time() - startupTime_start} seconds.")
 
 
@@ -465,11 +462,6 @@ support_available = bool(support_id)
 #Fix error on windows on shutdown
 if platform.system() == 'Windows':
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-def clear():
-    if platform.system() == 'Windows':
-        os.system('cls')
-    else:
-        os.system('clear')
 
 
 
