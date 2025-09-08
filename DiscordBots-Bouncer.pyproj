@@ -28,6 +28,7 @@
     <Compile Include="__init__.py" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include=".env" />
     <Content Include=".env.template" />
     <Content Include="docker-compose.yml" />
     <Content Include="requirements.txt" />

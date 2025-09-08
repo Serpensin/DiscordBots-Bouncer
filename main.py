@@ -22,6 +22,7 @@ from captcha.image import ImageCaptcha
 from CustomModules import log_handler
 from dotenv import load_dotenv
 from pytimeparse.timeparse import timeparse
+from typing import Tuple, Optional
 from urllib.parse import urlparse
 from zipfile import ZIP_DEFLATED, ZipFile
 
@@ -41,7 +42,7 @@ LOG_FOLDER = f'{APP_FOLDER_NAME}//Logs//'
 BUFFER_FOLDER = f'{APP_FOLDER_NAME}//Buffer//'
 ACTIVITY_FILE = os.path.join(APP_FOLDER_NAME, 'activity.json')
 DB_FILE = os.path.join(APP_FOLDER_NAME, f'{BOT_NAME}.db')
-BOT_VERSION = "1.5.7"
+BOT_VERSION = "1.5.8"
 
 sentry_sdk.init(
     dsn=os.getenv('SENTRY_DSN'),
@@ -98,7 +99,7 @@ class JSONValidator:
     def __init__(self, file_path):
         self.file_path = file_path
 
-    def validate_and_fix_json(self):
+    def validate_and_fix_json(self) -> None:
         if os.path.exists(self.file_path):
             with open(self.file_path, 'r') as file:
                 try:
@@ -113,7 +114,7 @@ class JSONValidator:
         else:
             self.write_default_content()
 
-    def write_default_content(self):
+    def write_default_content(self) -> None:
         with open(self.file_path, 'w') as file:
             json.dump(self.default_content, file, indent=4)
 validator = JSONValidator(ACTIVITY_FILE)
@@ -209,17 +210,17 @@ class aclient(discord.AutoShardedClient):
                 except AttributeError:
                     program_logger.warning(f"{error} -> {option_values} | Invoked by {interaction.user.name} ({interaction.user.id}) with Language {interaction.locale[1]}")
 
-    async def on_guild_join(self, guild):
+    async def on_guild_join(self, guild) -> None:
         if not self.initialized:
             return
         discord_logger.info(f'I joined {guild}. (ID: {guild.id})')
 
-    async def on_guild_remove(self, guild):
+    async def on_guild_remove(self, guild) -> None:
         if not self.initialized:
             return
         discord_logger.info(f'I got kicked from {guild}. (ID: {guild.id})')
 
-    async def on_member_join(self, member: discord.Member):
+    async def on_member_join(self, member: discord.Member) -> None:
         def account_age_in_seconds(member: discord.Member) -> int:
             now = datetime.datetime.now(datetime.UTC)
             created = member.created_at
@@ -253,13 +254,13 @@ class aclient(discord.AutoShardedClient):
         c.execute('INSERT INTO processing_joined VALUES (?, ?, ?)', (member.guild.id, member.id, int(time.time(),)))
         conn.commit()
 
-    async def on_member_remove(self, member: discord.Member):
+    async def on_member_remove(self, member: discord.Member) -> None:
         if not self.initialized:
             return
         c.execute('DELETE FROM processing_joined WHERE guild_id = ? AND user_id = ?', (member.guild.id, member.id,))
         conn.commit()
 
-    async def on_interaction(self, interaction: discord.Interaction):
+    async def on_interaction(self, interaction: discord.Interaction) -> None:
         if not self.initialized:
             return
         class WhyView(discord.ui.View):
@@ -295,8 +296,8 @@ class aclient(discord.AutoShardedClient):
                         pass
 
 
-    async def setup_database(self, shard_id):
-        def column_exists(conn, table, column_name):
+    async def setup_database(self, shard_id) -> None:
+        def column_exists(conn, table, column_name) -> bool:
             c = conn.cursor()
             c.execute(f'PRAGMA table_info({table})')
             for col in c.fetchall():
@@ -339,8 +340,8 @@ class aclient(discord.AutoShardedClient):
         self.db_conns[shard_id] = conn
 
 
-    async def on_message(self, message):
-        async def __wrong_selection():
+    async def on_message(self, message) -> None:
+        async def __wrong_selection() -> None:
             await message.channel.send('```'
                                        'Commands:\n'
                                        'activity - Set the activity of the bot\n'
@@ -374,7 +375,7 @@ class aclient(discord.AutoShardedClient):
             elif command == 'shutdown':
                 await Owner.shutdown(message)
                 return
-            
+
             elif command == 'broadcast':
                 await Owner.broadcast(' '.join(args))
                 return
@@ -383,7 +384,7 @@ class aclient(discord.AutoShardedClient):
                 await __wrong_selection()
 
 
-    async def on_ready(self):
+    async def on_ready(self) -> None:
         if self.initialized:
             await bot.change_presence(activity = self.Presence.get_activity(), status = self.Presence.get_status())
             return
@@ -434,7 +435,7 @@ class aclient(discord.AutoShardedClient):
         program_logger.info(f"Initialization completed in {time.time() - startupTime_start} seconds.")
 
 
-    async def on_disconnect(self):
+    async def on_disconnect(self) -> None:
         shard_id = self.shard_info.id if hasattr(self, 'shard_info') else 0
         conn = self.db_conns.pop(shard_id, None)
         if conn:
@@ -449,7 +450,7 @@ class SignalHandler:
         signal.signal(signal.SIGINT, self._shutdown)
         signal.signal(signal.SIGTERM, self._shutdown)
 
-    def _shutdown(self, signum, frame):
+    def _shutdown(self, signum, frame) -> None:
         program_logger.info('Received signal to shutdown...')
         program_logger.debug('Received signal to shutdown...')
         bot.loop.create_task(Owner.shutdown(owner))
@@ -466,7 +467,7 @@ if platform.system() == 'Windows':
 
 #Update botstats on websites
 class update_stats():
-    async def topgg():
+    async def topgg() -> None:
         headers = {
             'Authorization': topgg_token,
             'Content-Type': 'application/json'
@@ -481,7 +482,7 @@ class update_stats():
             except asyncio.CancelledError:
                 pass
 
-    async def discordlist():
+    async def discordlist() -> None:
         headers = {
             'Authorization': f'Bearer {discordlist_token}',
             'Content-Type': 'application/json; charset=utf-8'
@@ -496,7 +497,7 @@ class update_stats():
             except asyncio.CancelledError:
                 pass
 
-    async def discordbots():
+    async def discordbots() -> None:
         headers = {
             'Authorization': discordbots_token,
             'Content-Type': 'application/json'
@@ -511,7 +512,7 @@ class update_stats():
             except asyncio.CancelledError:
                 pass
 
-    async def discordbotlist_com():
+    async def discordbotlist_com() -> None:
         headers = {
             'Authorization': discordbotlistcom_token,
             'Content-Type': 'application/json'
@@ -526,7 +527,7 @@ class update_stats():
             except asyncio.CancelledError:
                 pass
 
-    async def discords():
+    async def discords() -> None:
         headers = {
             'Authorization': discords_token,
             'Content-Type': 'application/json'
@@ -541,7 +542,7 @@ class update_stats():
             except asyncio.CancelledError:
                 pass
 
-    async def discordbotlist_eu():
+    async def discordbotlist_eu() -> None:
         headers = {
             'Authorization': f'Bearer {discordbotlisteu_token}',
             'Content-Type': 'application/json; charset=utf-8'
@@ -560,8 +561,8 @@ class update_stats():
 
 #Functions
 class Functions():
-    async def health_server():
-        async def __health_check(request):
+    async def health_server() -> None:
+        async def __health_check(request) -> web.Response:
             return web.Response(text="Healthy")
 
         app = web.Application()
@@ -571,12 +572,12 @@ class Functions():
         site = web.TCPSite(runner, '0.0.0.0', 5000)
         await site.start()
 
-    def create_captcha():
+    def create_captcha() -> Tuple[io.BytesIO, str]:
         captcha_text = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(6))
         data = image_captcha.generate(captcha_text)
         return io.BytesIO(data.read()), captcha_text
 
-    async def create_support_invite(interaction: discord.Interaction):
+    async def create_support_invite(interaction: discord.Interaction) -> str:
         try:
             guild = bot.get_guild(int(support_id))
         except ValueError:
@@ -607,7 +608,7 @@ class Functions():
                 continue
         return "Could not create invite. There is either no text-channel, or I don't have the rights to create an invite."
 
-    async def verify(interaction: discord.Interaction):
+    async def verify(interaction: discord.Interaction) -> None:
         class CaptchaInput(discord.ui.Modal, title='Verification'):
             def __init__(self):
                 super().__init__()
@@ -686,7 +687,7 @@ class Functions():
             ephemeral=True
         )
 
-    async def process_latest_joined():
+    async def process_latest_joined() -> None:
         while not shutdown:
             current_time = int(time.time())
             for guild in bot.guilds:
@@ -738,7 +739,7 @@ class Functions():
             except asyncio.CancelledError:
                 break
 
-    async def check_and_process_temp_bans():
+    async def check_and_process_temp_bans() -> None:
         while not shutdown:
             current_time = time.time()
             c.execute('SELECT * FROM temp_bans WHERE unban_time < ?', (current_time,))
@@ -789,7 +790,7 @@ class Functions():
             except asyncio.CancelledError:
                 break
 
-    async def send_logging_message(interaction: discord.Interaction = None, member: discord.Member = None, kind: str = '', mass_amount: int = 0):
+    async def send_logging_message(interaction: discord.Interaction = None, member: discord.Member = None, kind: str = '', mass_amount: int = 0) -> None:
         guild_id = interaction.guild_id if interaction else member.guild.id
         c.execute('SELECT log_channel, ban_time, account_age_min FROM servers WHERE guild_id = ?', (guild_id,))
         row = c.fetchone()
@@ -856,7 +857,7 @@ class Functions():
         finally:
             program_logger.debug(f'Sent logging message in {log_channel.guild.name} ({log_channel.guild.id}) with type {kind}.')
 
-    def format_seconds(seconds):
+    def format_seconds(seconds) -> str:
         years, remainder = divmod(seconds, 31536000)
         days, remainder = divmod(remainder, 86400)
         hours, remainder = divmod(remainder, 3600)
@@ -880,8 +881,8 @@ class Functions():
 
 ##Owner Commands
 class Owner():
-    async def log(message, args):
-        async def __wrong_selection():
+    async def log(message, args) -> None:
+        async def __wrong_selection() -> None:
             await message.channel.send('```'
                                        'log [current/folder/lines] (Replace lines with a positive number, if you only want lines.) - Get the log\n'
                                        '```')
@@ -941,19 +942,19 @@ class Owner():
         await message.channel.send(content=f'Here are the last {len(log_lines)} lines of the current logfile:', file=discord.File(buffer_file_path))
         os.remove(buffer_file_path)
 
-    async def activity(message, args):
-        async def __wrong_selection():
+    async def activity(message, args) -> None:
+        async def __wrong_selection() -> None:
             await message.channel.send('```'
                                        'activity [playing/streaming/listening/watching/competing] [title] (url) - Set the activity of the bot\n'
                                        '```')
-        def isURL(zeichenkette):
+        def isURL(zeichenkette) -> bool:
             try:
                 ergebnis = urlparse(zeichenkette)
                 return all([ergebnis.scheme, ergebnis.netloc])
             except:
                 return False
 
-        def remove_and_save(liste):
+        def remove_and_save(liste) -> Optional[str]:
             if liste and isURL(liste[-1]):
                 return liste.pop()
             else:
@@ -997,8 +998,8 @@ class Owner():
         await bot.change_presence(activity = bot.Presence.get_activity(), status = bot.Presence.get_status())
         await message.channel.send(f'Activity set to {action} {title}{" " + url if url else ""}.')
 
-    async def status(message, args):
-        async def __wrong_selection():
+    async def status(message, args) -> None:
+        async def __wrong_selection() -> None:
             await message.channel.send('```'
                                        'status [online/idle/dnd/invisible] - Set the status of the bot\n'
                                        '```')
@@ -1025,7 +1026,7 @@ class Owner():
         await bot.change_presence(activity = bot.Presence.get_activity(), status = bot.Presence.get_status())
         await message.channel.send(f'Status set to {action}.')
 
-    async def shutdown(message):
+    async def shutdown(message) -> None:
         global shutdown
         _message = 'Engine powering down...'
         program_logger.info(_message)
@@ -1041,8 +1042,8 @@ class Owner():
         await asyncio.gather(*tasks, return_exceptions=True)
 
         await bot.close()
-        
-    async def broadcast(message):
+
+    async def broadcast(message) -> None:
         already_send = []
         success = 0
         forbidden = 0
@@ -1050,7 +1051,7 @@ class Owner():
         for guild in bot.guilds:
             guild_owner = await bot.fetch_user(guild.owner_id)
             if guild_owner.id in already_send:
-                continue            
+                continue
             try:
                 await guild_owner.send(f'Broadcast from the owner of the bot:\n{message}')
                 success += 1
@@ -1344,7 +1345,7 @@ async def self(interaction: discord.Interaction):
 
     await Functions.send_logging_message(interaction=interaction, kind='verify_mass_success', mass_amount=len(members_to_verify))
     await interaction.edit_original_response(content=f'{interaction.user.mention}\nVerified {len(members_to_verify)} users on the server.')
-        
+
 
 
 # Verify a single user
@@ -1354,7 +1355,7 @@ async def self(interaction: discord.Interaction):
 async def verify_user(interaction: discord.Interaction, member: discord.Member):
     c.execute('SELECT verify_role FROM servers WHERE guild_id = ?', (interaction.guild.id,))
     verify_role_id = c.fetchone()
-    
+
     if not verify_role_id:
         await interaction.response.send_message('There are no settings for this server.\nUse `/setup` to set-up this server.', ephemeral=True)
         return
@@ -1378,7 +1379,7 @@ async def verify_user(interaction: discord.Interaction, member: discord.Member):
 
 
 
-        
+
 
 
 
