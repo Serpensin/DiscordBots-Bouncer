@@ -11,7 +11,9 @@ Here is an example of a captcha:
 ![Example Captcha](https://imgur.com/WfzvPON.png)
 <audio controls>
   <source src="https://cdn.serpensin.com/captcha_1759064957.mp3" type="audio/mpeg">
-  Your browser does not support the audio element.
+  <a href="https://cdn.serpensin.com/captcha_1759064957.mp3">
+    <img src="https://img.shields.io/badge/??_Listen_to_Audio_Captcha-blue?style=for-the-badge" alt="Listen to Audio Captcha">
+  </a>
 </audio>
 
 ## Features
@@ -79,4 +81,3 @@ docker run -d \
 -p 5000:5000 \
 -v bouncer:/app/Bouncer \
 ghcr.io/serpensin/discordbots-bouncer
-```
