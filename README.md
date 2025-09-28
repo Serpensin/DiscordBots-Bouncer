@@ -9,14 +9,17 @@ The bot will only kick/ban users who join during the time, the bot is online.
 Here is an example of a captcha:
 
 ![Example Captcha](https://imgur.com/WfzvPON.png)
-
+<audio controls>
+  <source src="https://cdn.serpensin.com/captcha_1759064957.mp3" type="audio/mpeg">
+  Your browser does not support the audio element.
+</audio>
 
 ## Features
 
 - `/setup` followed by the required values will setup your server. There will be an explanation on what each option is for.
 - `/send_panel` will send the verification panel to the registered verification channel.
 - `/settings` will show you the current settings that are applied for this server.
-- `/verify-all` will applie tthe verified role to every member that isn't a bot.
+- `/verify-all` will apply the verified role to every member that isn't a bot.
 
 **Keep in mind that every of the above mentioned commands requires you to have `MANAGE_GUILD` permissions.**
 
