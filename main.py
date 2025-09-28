@@ -19,6 +19,7 @@ import string
 import sys
 from aiohttp import web
 from captcha.image import ImageCaptcha
+from captcha.audio import AudioCaptcha
 from CustomModules import log_handler
 from dotenv import load_dotenv
 from pytimeparse.timeparse import timeparse
@@ -32,6 +33,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 discord.VoiceClient.warn_nacl = False
 load_dotenv()
 image_captcha = ImageCaptcha()
+audio_captcha = AudioCaptcha()
 APP_FOLDER_NAME = 'Bouncer'
 BOT_NAME = 'Bouncer'
 if not os.path.exists(f'{APP_FOLDER_NAME}//Logs'):
@@ -572,10 +574,13 @@ class Functions():
         site = web.TCPSite(runner, '0.0.0.0', 5000)
         await site.start()
 
-    def create_captcha() -> Tuple[io.BytesIO, str]:
+    def create_captcha() -> Tuple[io.BytesIO, io.BytesIO, str]:
         captcha_text = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(6))
-        data = image_captcha.generate(captcha_text)
-        return io.BytesIO(data.read()), captcha_text
+        
+        image_data = image_captcha.generate(captcha_text)
+        audio_data = audio_captcha.generate(captcha_text)
+        
+        return io.BytesIO(image_data.read()), io.BytesIO(audio_data), captcha_text
 
     async def create_support_invite(interaction: discord.Interaction) -> str:
         try:
@@ -677,12 +682,18 @@ class Functions():
             return
 
         await Functions.send_logging_message(interaction=interaction, kind='verify_start')
-        captcha_picture, captcha_text = Functions.create_captcha()
+        captcha_picture, captcha_audio, captcha_text = Functions.create_captcha()
 
         bot.captcha_timeout.append(interaction.user.id)
+        
+        files = [
+            discord.File(captcha_picture, filename='captcha.png'),
+            discord.File(captcha_audio, filename='captcha.wav')
+        ]
+        
         await interaction.response.send_message(
-            'Please verify yourself to gain access to this server.\n\n**Captcha:**',
-            file=discord.File(captcha_picture, filename='captcha.png'),
+            'Please verify yourself to gain access to this server.\n\n**Captcha (Image and Audio):**\n*Listen to the audio or read the image and enter the text below.*',
+            files=files,
             view=SubmitView(),
             ephemeral=True
         )
@@ -1375,20 +1386,6 @@ async def verify_user(interaction: discord.Interaction, member: discord.Member):
         await Functions.send_logging_message(interaction=interaction, kind='user_verify', member=member)
     except discord.Forbidden:
         await interaction.response.send_message('I do not have permission to add roles to this user.', ephemeral=True)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
