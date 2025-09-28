@@ -1,4 +1,4 @@
-# Discord Bouncer [![Discord Bot Invite](https://img.shields.io/badge/Invite-blue)](https://discord.com/oauth2/authorize?client_id=1251187046329094314)[![Discord Bots](https://top.gg/api/widget/servers/1251187046329094314.svg)](https://top.gg/bot/1251187046329094314)
+﻿# Discord Bouncer [![Discord Bot Invite](https://img.shields.io/badge/Invite-blue)](https://discord.com/oauth2/authorize?client_id=1251187046329094314)[![Discord Bots](https://top.gg/api/widget/servers/1251187046329094314.svg)](https://top.gg/bot/1251187046329094314)
 
 **Force users to solve a captcha to get access to the server!**
 
@@ -8,11 +8,8 @@ If they don't verify within the time limit specified by the server, they will be
 The bot will only kick/ban users who join during the time, the bot is online.
 Here is an example of a captcha:
 
-![Example Captcha](https://imgur.com/WfzvPON.png)
-<audio controls>
-  <source src="https://cdn.serpensin.com/captcha_1759064957.mp3" type="audio/mpeg">
-  [![Listen to Audio Captcha](https://img.shields.io/badge/??_Listen_to_Audio_Captcha-blue?style=for-the-badge)](https://cdn.serpensin.com/captcha_1759064957.mp3)
-</audio>
+![Example Captcha](https://imgur.com/WfzvPON.png)\
+[![Listen to Audio Captcha](https://img.shields.io/badge/🔊_Listen_to_Audio_Captcha-blue?style=for-the-badge)](https://cdn.serpensin.com/captcha_1759064957.mp3)
 
 ## Features
 
